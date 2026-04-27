@@ -61,7 +61,7 @@
   const SUPABASE_URL = "https://jtsivhltrbpishfyhfxl.supabase.co";
   const SUPABASE_KEY = "sb_publishable_K6rHpM-Xy26NF3nlYf7Czg_2mgceKkP";
 
-  const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+  const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
   const messagesDiv = document.getElementById("messages");
 
@@ -69,7 +69,7 @@
   // LOAD MESSAGES
   // =========================
   async function loadMessages() {
-    const { data, error } = await supabase
+    const { data, error } = await sb
       .from("oha_chat")
       .select("*")
       .order("created_at", { ascending: true });
@@ -100,7 +100,7 @@
 
     if (!name || !message) return;
 
-    const { error } = await supabase
+    const { error } = await sb
       .from("oha_chat")
       .insert([{ name, message }]);
 
@@ -115,7 +115,7 @@
   // =========================
   // REALTIME UPDATES
   // =========================
-  supabase
+  sb
     .channel("chat")
     .on(
       "postgres_changes",
