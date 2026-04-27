@@ -1,18 +1,41 @@
 <!DOCTYPE html>
 <html>
 <head>
+  <meta charset="UTF-8">
   <title>Simple Chat</title>
+
   <style>
-    body { font-family: Arial; max-width: 600px; margin: auto; }
-    #chat { height: 400px; overflow-y: scroll; border: 1px solid #ccc; padding: 10px; }
-    input { width: 80%; }
+    body {
+      font-family: Arial;
+      max-width: 600px;
+      margin: auto;
+    }
+
+    #chat {
+      height: 400px;
+      overflow-y: scroll;
+      border: 1px solid #ccc;
+      padding: 10px;
+    }
+
+    input {
+      width: 75%;
+      padding: 5px;
+    }
+
+    button {
+      padding: 5px 10px;
+    }
   </style>
 </head>
+
 <body>
 
 <h2>Chat</h2>
 
 <div id="chat"></div>
+
+<br>
 
 <input id="msg" placeholder="Type message...">
 <button onclick="send()">Send</button>
@@ -20,19 +43,38 @@
 <script type="module">
 import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm";
 
-const supabaseUrl = "YOUR_SUPABASE_URL";
-const supabaseKey = "YOUR_SUPABASE_KEY";
+/* =========================
+   1. SUPABASE SETUP
+========================= */
+
+const supabaseUrl = "https://jtsivhltrbpishfyhfxl.supabase.co";
+const supabaseKey = "sb_publishable_K6rHpM-Xy26NF3nlYf7Czg_2mgceKkP";
+
 const supabase = createClient(supabaseUrl, supabaseKey);
 
-let name = prompt("Your name:");
+/* =========================
+   2. USERNAME
+========================= */
+
+let name = prompt("Enter your name:");
+if (!name) name = "Anonymous";
+
+/* =========================
+   3. LOAD MESSAGES
+========================= */
 
 async function loadMessages() {
-  let { data } = await supabase
-    .from('messages')
-    .select('*')
-    .order('id', { ascending: true });
+  const { data, error } = await supabase
+    .from("messages")
+    .select("*")
+    .order("id", { ascending: true });
 
-  let chat = document.getElementById("chat");
+  if (error) {
+    console.error(error);
+    return;
+  }
+
+  const chat = document.getElementById("chat");
   chat.innerHTML = "";
 
   data.forEach(m => {
@@ -42,25 +84,37 @@ async function loadMessages() {
   chat.scrollTop = chat.scrollHeight;
 }
 
-async function send() {
-  let msg = document.getElementById("msg").value;
+/* =========================
+   4. SEND MESSAGE
+========================= */
 
-  await supabase
-    .from('messages')
+window.send = async function () {
+  const msgInput = document.getElementById("msg");
+  const msg = msgInput.value;
+
+  if (!msg) return;
+
+  const { error } = await supabase
+    .from("messages")
     .insert([{ name: name, message: msg }]);
 
-  document.getElementById("msg").value = "";
+  if (error) {
+    console.error(error);
+    return;
+  }
+
+  msgInput.value = "";
   loadMessages();
-}
+};
 
-setInterval(loadMessages, 2000);
+/* =========================
+   5. AUTO REFRESH
+========================= */
+
 loadMessages();
+setInterval(loadMessages, 2000);
 
-window.send = send;
 </script>
-<script type="module">
-  const supabaseUrl = "https://jtsivhltrbpishfyhfxl.supabase.co";
-const supabaseKey = "sb_publishable_K6rHpM-Xy26NF3nlYf7Czg_2mgceKkP";
-</script>
+
 </body>
 </html>
