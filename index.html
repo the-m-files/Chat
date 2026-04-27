@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Simple Chat</title>
+  <style>
+    body { font-family: Arial; max-width: 600px; margin: auto; }
+    #chat { height: 400px; overflow-y: scroll; border: 1px solid #ccc; padding: 10px; }
+    input { width: 80%; }
+  </style>
+</head>
+<body>
+
+<h2>Chat</h2>
+
+<div id="chat"></div>
+
+<input id="msg" placeholder="Type message...">
+<button onclick="send()">Send</button>
+
+<script type="module">
+import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm";
+
+const supabaseUrl = "YOUR_SUPABASE_URL";
+const supabaseKey = "YOUR_SUPABASE_KEY";
+const supabase = createClient(supabaseUrl, supabaseKey);
+
+let name = prompt("Your name:");
+
+async function loadMessages() {
+  let { data } = await supabase
+    .from('messages')
+    .select('*')
+    .order('id', { ascending: true });
+
+  let chat = document.getElementById("chat");
+  chat.innerHTML = "";
+
+  data.forEach(m => {
+    chat.innerHTML += `<p><b>${m.name}:</b> ${m.message}</p>`;
+  });
+
+  chat.scrollTop = chat.scrollHeight;
+}
+
+async function send() {
+  let msg = document.getElementById("msg").value;
+
+  await supabase
+    .from('messages')
+    .insert([{ name: name, message: msg }]);
+
+  document.getElementById("msg").value = "";
+  loadMessages();
+}
+
+setInterval(loadMessages, 2000);
+loadMessages();
+
+window.send = send;
+</script>
+
+</body>
+</html>
