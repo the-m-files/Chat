@@ -50,17 +50,19 @@
 <input id="message" placeholder="Type a message..." />
 <button onclick="sendMessage()">Send</button>
 
-<!-- Supabase (IMPORTANT: use unpkg for stability) -->
+<!-- Supabase -->
 <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
 
 <script>
-  console.log("VERSION 2 CLEAN FILE");
+  console.log("OHA CHAT LOADED CLEANLY");
+
   // =========================
-  // SUPABASE INIT (ONLY ONCE)
+  // SUPABASE INIT (NO CONFLICT)
   // =========================
   const SUPABASE_URL = "https://jtsivhltrbpishfyhfxl.supabase.co";
-  const SUPABASE_KEY = "sb_publishable_K6rHpM-Xy26NF3nlYf7Czg_2mgceKkP";
+  const SUPABASE_KEY = "YOUR_ANON_KEY_HERE";
 
+  // IMPORTANT: use sb instead of supabase to avoid naming collision
   const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
   const messagesDiv = document.getElementById("messages");
