@@ -95,7 +95,7 @@ window.send = async function () {
   if (!msg) return;
 
   const { error } = await supabase
-    .from("messages")
+    .from("OHA chat")
     .insert([{ name: name, message: msg }]);
 
   if (error) {
