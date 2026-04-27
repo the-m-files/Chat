@@ -65,7 +65,7 @@ if (!name) name = "Anonymous";
 
 async function loadMessages() {
   const { data, error } = await supabase
-    .from("messages")
+    .from("message")
     .select("*")
     .order("id", { ascending: true });
 
