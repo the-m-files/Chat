@@ -1,1 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Login - OHA Chat</title>
 
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 400px;
+      margin: 60px auto;
+      text-align: center;
+    }
+
+    input, button {
+      width: 100%;
+      padding: 10px;
+      margin-top: 10px;
+      box-sizing: border-box;
+    }
+
+    button {
+      cursor: pointer;
+    }
+  </style>
+</head>
+
+<body>
+
+<h2>Login / Sign Up</h2>
+
+<input id="email" type="email" placeholder="Email" />
+<input id="password" type="password" placeholder="Password" />
+
+<button onclick="signUp()">Sign Up</button>
+<button onclick="login()">Login</button>
+
+<p id="status"></p>
+
+<script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+
+<script>
+  console.log("Login Page Loaded");
+
+  const SUPABASE_URL = "https://jtsivhltrbpishfyhfxl.supabase.co";
+  const SUPABASE_KEY = "YOUR_REAL_ANON_KEY";
+
+  const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+  const status = document.getElementById("status");
+
+  // =========================
+  // SIGN UP
+  // =========================
+  async function signUp() {
+    const email = document.getElementById("email").value;
+    const password = document.getElementById("password").value;
+
+    const { error } = await sb.auth.signUp({
+      email,
+      password
+    });
+
+    if (error) {
+      status.textContent = error.message;
+    } else {
+      status.textContent = "Check your email to confirm!";
+    }
+  }
+
+  // =========================
+  // LOGIN
+  // =========================
+  async function login() {
+    const email = document.getElementById("email").value;
+    const password = document.getElementById("password").value;
+
+    const { error } = await sb.auth.signInWithPassword({
+      email,
+      password
+    });
+
+    if (error) {
+      status.textContent = error.message;
+    } else {
+      window.location.href = "index.html";
+    }
+  }
+
+  // =========================
+  // AUTO REDIRECT IF LOGGED IN
+  // =========================
+  (async () => {
+    const { data: { user } } = await sb.auth.getUser();
+
+    if (user) {
+      window.location.href = "index.html";
+    }
+  })();
+
+</script>
+
+</body>
+</html>
