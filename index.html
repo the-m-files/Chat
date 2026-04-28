@@ -1,66 +1,92 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Login</title>
+  <title>OHA Chat</title>
   <style>
-    body { font-family: Arial; max-width: 400px; margin: 50px auto; text-align: center; }
-    input, button { width: 100%; padding: 10px; margin-top: 10px; }
+    body { font-family: Arial; max-width: 600px; margin: 20px auto; }
+    #messages { border: 1px solid #ccc; height: 400px; overflow-y: auto; padding: 10px; }
+    .msg { margin-bottom: 8px; }
+    .name { font-weight: bold; }
+    input, button { width: 100%; padding: 10px; margin-top: 5px; }
   </style>
 </head>
 <body>
 
-<h2>Login / Sign Up</h2>
+<h2>OHA Chat</h2>
 
-<input id="username" placeholder="Username" />
-<input id="password" type="password" placeholder="Password" />
+<button onclick="logout()">Logout</button>
 
-<button onclick="signup()">Sign Up</button>
-<button onclick="login()">Login</button>
+<div id="messages"></div>
 
-<p id="status"></p>
+<input id="message" placeholder="Type a message..." />
+<button onclick="sendMessage()">Send</button>
 
 <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
 
 <script>
 const sb = window.supabase.createClient(
   "https://jtsivhltrbpishfyhfxl.supabase.co",
-  "YOUR_ANON_KEY"
+  "sb_publishable_K6rHpM-Xy26NF3nlYf7Czg_2mgceKkP"
 );
 
-const status = document.getElementById("status");
+const messagesDiv = document.getElementById("messages");
 
-async function signup() {
-  const username = document.getElementById("username").value;
-  const password = document.getElementById("password").value;
-
-  if (!username || !password) {
-    status.textContent = "Fill all fields";
-    return;
-  }
-
-  const { error } = await sb.from("users").insert([{ username, password }]);
-
-  status.textContent = error ? error.message : "Account created!";
+// 🔒 Check login
+const user = localStorage.getItem("user");
+if (!user) {
+  window.location.href = "login.html";
 }
 
-async function login() {
-  const username = document.getElementById("username").value;
-  const password = document.getElementById("password").value;
-
+// Load messages
+async function loadMessages() {
   const { data } = await sb
-    .from("users")
+    .from("oha_chat")
     .select("*")
-    .eq("username", username)
-    .eq("password", password)
-    .single();
+    .order("created_at", { ascending: true });
 
-  if (!data) {
-    status.textContent = "Wrong login";
-  } else {
-    localStorage.setItem("user", username);
-    window.location.href = "index.html";
-  }
+  messagesDiv.innerHTML = "";
+  data.forEach(renderMessage);
 }
+
+// Render message
+function renderMessage(msg) {
+  const div = document.createElement("div");
+  div.className = "msg";
+  div.innerHTML = `<span class="name">${msg.name}:</span> ${msg.message}`;
+  messagesDiv.appendChild(div);
+}
+
+// Send message
+async function sendMessage() {
+  const message = document.getElementById("message").value;
+  if (!message) return;
+
+  await sb.from("oha_chat").insert([
+    { name: user, message }
+  ]);
+
+  document.getElementById("message").value = "";
+}
+
+// Realtime
+sb.channel("chat")
+  .on("postgres_changes", {
+    event: "INSERT",
+    schema: "public",
+    table: "oha_chat"
+  }, payload => {
+    renderMessage(payload.new);
+  })
+  .subscribe();
+
+// Logout
+function logout() {
+  localStorage.removeItem("user");
+  window.location.href = "login.html";
+}
+
+// Init
+loadMessages();
 </script>
 
 </body>
