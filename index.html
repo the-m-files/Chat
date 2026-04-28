@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Chat</title>
+  <title>OHA Chat</title>
 
   <style>
     body {
@@ -37,47 +37,45 @@
     button {
       cursor: pointer;
     }
-    .copy-button {
-  background-color: #007bff;
-  color: white;
-  border: none;
-  padding: 10px 20px;
-  cursor: pointer;
-  border-radius: 5px;
-  transition: background 0.3s;
-}
-.copy-button:hover { background-color: #0056b3; }
   </style>
-  
 </head>
 
 <body>
 
 <h2>OHA Chat</h2>
 
+<button onclick="logout()">Logout</button>
+
 <div id="messages"></div>
 
-<input id="name" placeholder="Your name" />
 <input id="message" placeholder="Type a message..." />
 <button onclick="sendMessage()">Send</button>
 
-
-<!-- Supabase -->
 <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
 
 <script>
-  console.log("OHA CHAT LOADED CLEANLY");
+  console.log("OHA Chat Secure v2");
 
-  // =========================
-  // SUPABASE INIT (NO CONFLICT)
-  // =========================
   const SUPABASE_URL = "https://jtsivhltrbpishfyhfxl.supabase.co";
   const SUPABASE_KEY = "sb_publishable_K6rHpM-Xy26NF3nlYf7Czg_2mgceKkP";
 
-  // IMPORTANT: use sb instead of supabase to avoid naming collision
   const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
   const messagesDiv = document.getElementById("messages");
+
+  // =========================
+  // AUTH CHECK (protect page)
+  // =========================
+  async function checkUser() {
+    const { data: { user } } = await sb.auth.getUser();
+
+    if (!user) {
+      window.location.href = "login.html";
+      return null;
+    }
+
+    return user;
+  }
 
   // =========================
   // LOAD MESSAGES
@@ -101,22 +99,31 @@
   function renderMessage(msg) {
     const div = document.createElement("div");
     div.className = "msg";
-    div.innerHTML = `<span class="name">${msg.name}:</span> ${msg.message}`;
+
+    // Show shortened user_id (temporary display)
+    const shortId = msg.user_id ? msg.user_id.slice(0, 6) : "unknown";
+
+    div.innerHTML = `<span class="name">${shortId}:</span> ${msg.message}`;
     messagesDiv.appendChild(div);
   }
 
   // =========================
-  // SEND MESSAGE
+  // SEND MESSAGE (SECURE)
   // =========================
   async function sendMessage() {
-    const name = document.getElementById("name").value.trim();
     const message = document.getElementById("message").value.trim();
+    const user = await checkUser();
 
-    if (!name || !message) return;
+    if (!message || !user) return;
 
     const { error } = await sb
       .from("oha_chat")
-      .insert([{ name, message }]);
+      .insert([
+        {
+          message,
+          user_id: user.id
+        }
+      ]);
 
     if (error) {
       console.error("Send error:", error);
@@ -129,8 +136,7 @@
   // =========================
   // REALTIME UPDATES
   // =========================
-  sb
-    .channel("chat")
+  sb.channel("chat")
     .on(
       "postgres_changes",
       {
@@ -146,9 +152,24 @@
     .subscribe();
 
   // =========================
-  // INITIAL LOAD
+  // LOGOUT
   // =========================
-  loadMessages();
+  async function logout() {
+    await sb.auth.signOut();
+    window.location.href = "login.html";
+  }
+
+  // =========================
+  // INIT
+  // =========================
+  (async () => {
+    const user = await checkUser();
+    if (!user) return;
+
+    loadMessages();
+  })();
+
 </script>
+
 </body>
 </html>
