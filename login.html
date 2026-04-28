@@ -1,38 +1,20 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-  <meta charset="UTF-8" />
-  <title>Login - OHA Chat</title>
-
+  <title>Login</title>
   <style>
-    body {
-      font-family: Arial, sans-serif;
-      max-width: 400px;
-      margin: 60px auto;
-      text-align: center;
-    }
-
-    input, button {
-      width: 100%;
-      padding: 10px;
-      margin-top: 10px;
-      box-sizing: border-box;
-    }
-
-    button {
-      cursor: pointer;
-    }
+    body { font-family: Arial; max-width: 400px; margin: 50px auto; text-align: center; }
+    input, button { width: 100%; padding: 10px; margin-top: 10px; }
   </style>
 </head>
-
 <body>
 
 <h2>Login / Sign Up</h2>
 
-<input id="email" type="email" placeholder="Email" />
+<input id="username" placeholder="Username" />
 <input id="password" type="password" placeholder="Password" />
 
-<button onclick="signUp()">Sign Up</button>
+<button onclick="signup()">Sign Up</button>
 <button onclick="login()">Login</button>
 
 <p id="status"></p>
@@ -40,64 +22,45 @@
 <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
 
 <script>
-  console.log("Login Page Loaded");
+const sb = window.supabase.createClient(
+  "https://jtsivhltrbpishfyhfxl.supabase.co",
+  "sb_publishable_K6rHpM-Xy26NF3nlYf7Czg_2mgceKkP"
+);
 
-  const SUPABASE_URL = "https://jtsivhltrbpishfyhfxl.supabase.co";
-  const SUPABASE_KEY = "sb_publishable_K6rHpM-Xy26NF3nlYf7Czg_2mgceKkP";
+const status = document.getElementById("status");
 
-  const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+async function signup() {
+  const username = document.getElementById("username").value;
+  const password = document.getElementById("password").value;
 
-  const status = document.getElementById("status");
-
-  // =========================
-  // SIGN UP
-  // =========================
-  async function signUp() {
-    const email = document.getElementById("email").value;
-    const password = document.getElementById("password").value;
-
-    const { error } = await sb.auth.signUp({
-      email,
-      password
-    });
-
-    if (error) {
-      status.textContent = error.message;
-    } else {
-      status.textContent = "Check your email to confirm!";
-    }
+  if (!username || !password) {
+    status.textContent = "Fill all fields";
+    return;
   }
 
-  // =========================
-  // LOGIN
-  // =========================
-  async function login() {
-    const email = document.getElementById("email").value;
-    const password = document.getElementById("password").value;
+  const { error } = await sb.from("users").insert([{ username, password }]);
 
-    const { error } = await sb.auth.signInWithPassword({
-      email,
-      password
-    });
+  status.textContent = error ? error.message : "Account created!";
+}
 
-    if (error) {
-      status.textContent = error.message;
-    } else {
-      window.location.href = "index.html";
-    }
+async function login() {
+  const username = document.getElementById("username").value;
+  const password = document.getElementById("password").value;
+
+  const { data } = await sb
+    .from("users")
+    .select("*")
+    .eq("username", username)
+    .eq("password", password)
+    .single();
+
+  if (!data) {
+    status.textContent = "Wrong login";
+  } else {
+    localStorage.setItem("user", username);
+    window.location.href = "index.html";
   }
-
-  // =========================
-  // AUTO REDIRECT IF LOGGED IN
-  // =========================
-  (async () => {
-    const { data: { user } } = await sb.auth.getUser();
-
-    if (user) {
-      window.location.href = "index.html";
-    }
-  })();
-
+}
 </script>
 
 </body>
