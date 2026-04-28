@@ -37,7 +37,18 @@
     button {
       cursor: pointer;
     }
+    .copy-button {
+  background-color: #007bff;
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  cursor: pointer;
+  border-radius: 5px;
+  transition: background 0.3s;
+}
+.copy-button:hover { background-color: #0056b3; }
   </style>
+  
 </head>
 
 <body>
@@ -49,6 +60,7 @@
 <input id="name" placeholder="Your name" />
 <input id="message" placeholder="Type a message..." />
 <button onclick="sendMessage()">Send</button>
+
 
 <!-- Supabase -->
 <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
@@ -138,6 +150,5 @@
   // =========================
   loadMessages();
 </script>
-
 </body>
 </html>
