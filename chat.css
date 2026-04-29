@@ -58,7 +58,7 @@
 .special {
   color: gold;
   font-weight: bold;
-  text-shadow: 0 0 5px gold;
+  text-shadow: 0 0 5px #ff00ff;
 }
 
 .admin {
