@@ -55,4 +55,13 @@
   button:hover {
     background: #ddd;
   }
+.special {
+  color: gold;
+  font-weight: bold;
+  text-shadow: 0 0 5px gold;
+}
 
+.admin {
+  color: red;
+  font-weight: bold;
+}

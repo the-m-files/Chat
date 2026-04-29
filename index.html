@@ -18,100 +18,125 @@
 <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
 
 <script>
-const sb = window.supabase.createClient(
-  "https://jtsivhltrbpishfyhfxl.supabase.co",
-  "sb_publishable_K6rHpM-Xy26NF3nlYf7Czg_2mgceKkP"
-);
+  const sb = window.supabase.createClient(
+    "https://jtsivhltrbpishfyhfxl.supabase.co",
+    "YOUR_ANON_KEY"
+  );
 
-const messagesDiv = document.getElementById("messages");
+  const messagesDiv = document.getElementById("messages");
+  const input = document.getElementById("message");
 
-// 🔒 Check login
-const user = localStorage.getItem("user");
-if (!user) {
-  window.location.href = "login.html";
-}
-function logout() {
-  localStorage.removeItem("user");
-  window.location.href = "login.html";
-}
-// Load messages
-async function loadMessages() {
-  const { data } = await sb
-    .from("oha_chat")
-    .select("*")
-    .order("created_at", { ascending: true });
-
-  messagesDiv.innerHTML = "";
-  data.forEach(renderMessage);
-}
-
-// Render message
-function renderMessage(msg) {
-  const div = document.createElement("div");
-  div.className = "msg";
-  div.innerHTML = `<span class="name">${msg.name}:</span> ${msg.message}`;
-  messagesDiv.appendChild(div);
-}
-
-// Send message
-async function sendMessage() {
-  const message = document.getElementById("message").value;
-  if (!message) return;
-
-  await sb.from("oha_chat").insert([
-    { name: user, message }
-  ]);
-
-  document.getElementById("message").value = "";
-}
-
-// Realtime
-sb.channel("chat")
-  .on("postgres_changes", {
-    event: "INSERT",
-    schema: "public",
-    table: "oha_chat"
-  }, payload => {
-    renderMessage(payload.new);
-  })
-  .subscribe();
-
-// Logout
-function logout() {
-  localStorage.removeItem("user");
-  window.location.href = "login.html";
-}
-const input = document.getElementById("message");
-
-input.addEventListener("keydown", function(e) {
-  if (e.key === "Enter") {
-    e.preventDefault(); // stops weird behavior
-    sendMessage();
-  }
-});
-function goAdmin() {
-  window.location.href = "admin.html";
-}
-async function checkIfBanned() {
+  // 🔒 Check login
   const user = localStorage.getItem("user");
+  if (!user) {
+    window.location.href = "login.html";
+  }
 
-  const { data } = await sb
-    .from("users")
-    .select("banned")
-    .eq("username", user)
-    .single();
+  // 🚫 Check if banned
+  async function checkIfBanned() {
+    const { data } = await sb
+      .from("users")
+      .select("banned")
+      .eq("username", user)
+      .single();
 
-  if (data?.banned) {
-    alert("You are banned");
+    if (data?.banned) {
+      alert("You are banned");
+      localStorage.removeItem("user");
+      window.location.href = "login.html";
+    }
+  }
+
+  checkIfBanned();
+
+  // 🎨 Special users mapping
+  const specialUsers = {
+    "admin": "admin",
+    "Mahath": "special",
+    "CoolKid": "rainbow"
+  };
+
+  // 📥 Load messages
+  async function loadMessages() {
+    const { data } = await sb
+      .from("oha_chat")
+      .select("*")
+      .order("created_at", { ascending: true });
+
+    messagesDiv.innerHTML = "";
+    data.forEach(renderMessage);
+
+    messagesDiv.scrollTop = messagesDiv.scrollHeight;
+  }
+
+  // 💬 Render message
+  function renderMessage(msg) {
+    const div = document.createElement("div");
+    div.className = "msg";
+
+    const extraClass = specialUsers[msg.name] || "";
+
+    div.innerHTML = `
+      <span class="name ${extraClass}">${msg.name}:</span> ${msg.message}
+    `;
+
+    messagesDiv.appendChild(div);
+  }
+
+  // 📤 Send message
+  async function sendMessage() {
+    const message = input.value.trim();
+    if (!message) return;
+
+    await sb.from("oha_chat").insert([
+      { name: user, message }
+    ]);
+
+    input.value = "";
+  }
+
+  // ⌨️ Enter to send
+  input.addEventListener("keydown", function(e) {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      sendMessage();
+    }
+  });
+
+  // 🔄 Realtime updates
+  sb.channel("chat")
+    .on("postgres_changes", {
+      event: "INSERT",
+      schema: "public",
+      table: "oha_chat"
+    }, payload => {
+      renderMessage(payload.new);
+      messagesDiv.scrollTop = messagesDiv.scrollHeight;
+    })
+    .subscribe();
+
+  // 🚪 Logout
+  function logout() {
     localStorage.removeItem("user");
     window.location.href = "login.html";
   }
-}
 
-// call it
-checkIfBanned();
-// Init
-loadMessages();
+  // 👑 Go to admin panel
+  function goAdmin() {
+    window.location.href = "admin.html";
+  }
+
+  // 🚀 Initial load
+  loadMessages();
+
+  // 🎯 Focus input on load
+  // IMPORTANT USERS:
+  input.focus();
+  const specialUsers = {
+  "lemony !! 🍋 💖": "special",
+  "Mahathish": "admin",
+  "CoolKid": "rainbow"
+};
 </script>
 
 </body>
