@@ -9,7 +9,7 @@
 <h2>OHA Chat</h2>
 
 <button onclick="logout()">Logout</button>
-
+<button onclick="goAdmin()">Admin</button>
 <div id="messages"></div>
 
 <input type="text" id="message" placeholder="Type a message..." />
@@ -30,7 +30,10 @@ const user = localStorage.getItem("user");
 if (!user) {
   window.location.href = "login.html";
 }
-
+function logout() {
+  localStorage.removeItem("user");
+  window.location.href = "login.html";
+}
 // Load messages
 async function loadMessages() {
   const { data } = await sb
@@ -78,7 +81,35 @@ function logout() {
   localStorage.removeItem("user");
   window.location.href = "login.html";
 }
+const input = document.getElementById("message");
 
+input.addEventListener("keydown", function(e) {
+  if (e.key === "Enter") {
+    e.preventDefault(); // stops weird behavior
+    sendMessage();
+  }
+});
+function goAdmin() {
+  window.location.href = "admin.html";
+}
+async function checkIfBanned() {
+  const user = localStorage.getItem("user");
+
+  const { data } = await sb
+    .from("users")
+    .select("banned")
+    .eq("username", user)
+    .single();
+
+  if (data?.banned) {
+    alert("You are banned");
+    localStorage.removeItem("user");
+    window.location.href = "login.html";
+  }
+}
+
+// call it
+checkIfBanned();
 // Init
 loadMessages();
 </script>

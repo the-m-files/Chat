@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Admin Panel</title>
+
+    <style>
+        body {
+          font-family: Arial, sans-serif;
+          background: #f2f2f2;
+          max-width: 600px;
+          margin: 20px auto;
+        }
+
+        h2 {
+          text-align: center;
+        }
+
+        .user {
+          background: white;
+          border: 1px solid #ccc;
+          padding: 10px;
+          margin-bottom: 8px;
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+        }
+
+        button {
+          padding: 5px 10px;
+          margin-left: 5px;
+          border: 1px solid #ccc;
+          background: #eee;
+          cursor: pointer;
+        }
+
+        button:hover {
+          background: #ddd;
+        }
+
+        .banned {
+          color: red;
+          font-weight: bold;
+        }
+    </style>
+</head>
+
+<body>
+
+<h2>Admin Panel</h2>
+
+<div id="users"></div>
+
+<script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+
+<script>
+    const sb = window.supabase.createClient(
+      "https://jtsivhltrbpishfyhfxl.supabase.co",
+      "sb_publishable_K6rHpM-Xy26NF3nlYf7Czg_2mgceKkP"
+    );
+
+    // 🔒 Only allow admin
+    const currentUser = localStorage.getItem("user");
+
+    if (currentUser !== "Mahathish") {
+      alert("Access denied");
+      window.location.href = "index.html";
+    }
+
+    // Load users
+    async function loadUsers() {
+      const { data } = await sb.from("users").select("*");
+
+      const container = document.getElementById("users");
+      container.innerHTML = "";
+
+      data.forEach(user => {
+        const div = document.createElement("div");
+        div.className = "user";
+
+        div.innerHTML = `
+          <span>
+            ${user.username}
+            ${user.banned ? '<span class="banned">(BANNED)</span>' : ''}
+          </span>
+          <div>
+            <button onclick="toggleBan('${user.username}', ${user.banned})">
+              ${user.banned ? "Unban" : "Ban"}
+            </button>
+            <button onclick="deleteUser('${user.username}')">Delete</button>
+          </div>
+        `;
+
+        container.appendChild(div);
+      });
+    }
+
+    // Ban / Unban
+    async function toggleBan(username, banned) {
+      await sb.from("users")
+        .update({ banned: !banned })
+        .eq("username", username);
+
+      loadUsers();
+    }
+
+    // Delete user
+    async function deleteUser(username) {
+      if (!confirm("Delete this user?")) return;
+
+      await sb.from("users")
+        .delete()
+        .eq("username", username);
+
+      loadUsers();
+    }
+
+    loadUsers();
+</script>
+
+</body>
+</html>

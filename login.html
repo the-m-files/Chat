@@ -2,68 +2,80 @@
 <html>
 <head>
   <title>Login</title>
- <!-- <style>
-    body { font-family: Arial; max-width: 400px; margin: 50px auto; text-align: center; }
-    input, button { width: 100%; padding: 10px; margin-top: 10px; }
-  </style>-->
-
-  <link rel="stylesheet" href="chat.css"/>
+<link rel="stylesheet" href="login.css">
 </head>
+
 <body>
 
-<h2>Login / Sign Up</h2>
+<h2>OHA Chat</h2>
 
-<input id="username" placeholder="Username" />
-<input id="password" type="password" placeholder="Password" />
+<div class="box">
+  <input id="username" placeholder="Username" />
+  <input id="password" type="password" placeholder="Password" />
 
-<button onclick="signup()">Sign Up</button>
-<button onclick="login()">Login</button>
+  <button onclick="login()">Login</button>
+  <button onclick="signup()">Sign Up</button>
 
-<p id="status"></p>
+  <p id="status"></p>
+</div>
+
+<script src="https://unpkg.com/@supabase/supabase-js@2"></script>
 
 <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
 
 <script>
-const sb = window.supabase.createClient(
-  "https://jtsivhltrbpishfyhfxl.supabase.co",
-  "sb_publishable_K6rHpM-Xy26NF3nlYf7Czg_2mgceKkP"
-);
+  const sb = window.supabase.createClient(
+    "https://jtsivhltrbpishfyhfxl.supabase.co",
+    "sb_publishable_K6rHpM-Xy26NF3nlYf7Czg_2mgceKkP"
+  );
 
-const status = document.getElementById("status");
+  const status = document.getElementById("status");
 
-async function signup() {
-  const username = document.getElementById("username").value;
-  const password = document.getElementById("password").value;
+  // SIGN UP
+  async function signup() {
+    const username = document.getElementById("username").value;
+    const password = document.getElementById("password").value;
 
-  if (!username || !password) {
-    status.textContent = "Fill all fields";
-    return;
+    if (!username || !password) {
+      status.textContent = "Fill all fields";
+      return;
+    }
+
+    const { error } = await sb.from("users").insert([
+      { username, password }
+    ]);
+
+    status.textContent = error ? error.message : "Account created!";
   }
 
-  const { error } = await sb.from("users").insert([{ username, password }]);
+  // LOGIN
+  async function login() {
+    const username = document.getElementById("username").value;
+    const password = document.getElementById("password").value;
 
-  status.textContent = error ? error.message : "Account created!";
-}
+    const { data } = await sb
+      .from("users")
+      .select("*")
+      .eq("username", username)
+      .eq("password", password)
+      .single();
 
-async function login() {
-  const username = document.getElementById("username").value;
-  const password = document.getElementById("password").value;
-
-  const { data } = await sb
-    .from("users")
-    .select("*")
-    .eq("username", username)
-    .eq("password", password)
-    .single();
-
-  if (!data) {
-    status.textContent = "Wrong login";
-  } else {
-    localStorage.setItem("user", username);
-    window.location.href = "index.html";
+    if (!data) {
+      status.textContent = "Wrong username or password";
+    } else if (data.banned) {
+      status.textContent = "You are banned.";
+    } else {
+      localStorage.setItem("user", username);
+      window.location.href = "index.html";
+    }
   }
-}
+
+  // ENTER KEY SUPPORT
+  document.addEventListener("keydown", function(e) {
+    if (e.key === "Enter") {
+      login();
+    }
+  });
 </script>
-
 </body>
 </html>
