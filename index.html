@@ -10,6 +10,7 @@
 
 <button onclick="logout()">Logout</button>
 <button onclick="goAdmin()">Admin</button>
+
 <div id="messages"></div>
 
 <input type="text" id="message" placeholder="Type a message..." />
@@ -25,6 +26,13 @@
 
   const messagesDiv = document.getElementById("messages");
   const input = document.getElementById("message");
+
+  // ⭐ SPECIAL USERS (FIXED POSITION)
+  const specialUsers = {
+    "lemony !! 🍋 💖": "special",
+    "Mahathish": "admin",
+    "CoolKid": "rainbow"
+  };
 
   // 🔒 Check login
   const user = localStorage.getItem("user");
@@ -48,8 +56,6 @@
   }
 
   checkIfBanned();
-
-
 
   // 📥 Load messages
   async function loadMessages() {
@@ -124,14 +130,8 @@
   // 🚀 Initial load
   loadMessages();
 
-  // 🎯 Focus input on load
-  // IMPORTANT USERS:
+  // 🎯 Focus input
   input.focus();
-  const specialUsers = {
-  "lemony !! 🍋 💖": "special",
-  "Mahathish": "admin",
-  "CoolKid": "rainbow"
-};
 </script>
 
 </body>
