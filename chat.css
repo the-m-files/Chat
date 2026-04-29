@@ -11,6 +11,7 @@
   }
 
   #messages {
+  font-family: Arial, sans-serif;
     background: white;
     border: 1px solid #ccc;
     height: 400px;
