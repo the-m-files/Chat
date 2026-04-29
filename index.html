@@ -84,26 +84,76 @@
     messagesDiv.appendChild(div);
   }
 
-  // 📤 Send message
   async function sendMessage() {
-    const message = input.value.trim();
-    if (!message) return;
+  const message = input.value.trim();
+  if (!message) return;
 
-    await sb.from("oha_chat").insert([
-      { name: user, message }
-    ]);
+  // 🔒 CHECK BAN BEFORE SENDING
+  const { data } = await sb
+    .from("users")
+    .select("banned")
+    .eq("username", user)
+    .single();
 
-    input.value = "";
+  if (data?.banned) {
+    alert("You are banned");
+    localStorage.removeItem("user");
+    window.location.href = "login.html";
+    return;
   }
 
-  // ⌨️ Enter to send
-  input.addEventListener("keydown", function(e) {
-    if (e.key === "Enter") {
-      e.preventDefault();
-      sendMessage();
-    }
-  });
+  await sb.from("oha_chat").insert([
+    { name: user, message }
+  ]);
 
+  input.value = "";
+}
+//auto kick when banned
+sb.channel("users-watch")
+  .on("postgres_changes", {
+    event: "UPDATE",
+    schema: "public",
+    table: "users"
+  }, payload => {
+    if (payload.new.username === user && payload.new.banned) {
+      alert("You have been banned");
+      localStorage.removeItem("user");
+      window.location.href = "login.html";
+    }
+  })
+  .subscribe();
+  async function sendMessage() {
+  const message = input.value.trim();
+  if (!message) return;
+
+  const { data } = await sb
+    .from("users")
+    .select("*")
+    .eq("username", user)
+    .single();
+
+  // ❌ user no longer exists
+  if (!data) {
+    alert("Account removed");
+    localStorage.removeItem("user");
+    window.location.href = "login.html";
+    return;
+  }
+
+  // 🚫 banned
+  if (data.banned) {
+    alert("You are banned");
+    localStorage.removeItem("user");
+    window.location.href = "login.html";
+    return;
+  }
+
+  await sb.from("oha_chat").insert([
+    { name: user, message }
+  ]);
+
+  input.value = "";
+}
   // 🔄 Realtime updates
   sb.channel("chat")
     .on("postgres_changes", {
