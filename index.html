@@ -7,17 +7,37 @@
 </head>
 <body>
 
-<h2>OHA Chat</h2>
-<h3 class="Online-Users">Online Users</h3>
-<div id="onlineUsers"></div>
-<button onclick="logout()">Logout</button>
-<button onclick="goAdmin()">Admin</button>
+<div class="container">
 
-<div id="messages"></div>
+  <!-- 🟢 SIDEBAR -->
+  <div class="sidebar">
+    <h3>Online</h3>
+    <div id="onlineUsers"></div>
+  </div>
 
-<input type="text" id="message" placeholder="Type a message..." />
-<button onclick="sendMessage()">Send</button>
+  <!-- 💬 MAIN CHAT -->
+  <div class="chat">
 
+    <div class="topbar">
+      <h2>OHA Chat</h2>
+      <div>
+        <button onclick="logout()">Logout</button>
+        <button onclick="goAdmin()">Admin</button>
+      </div>
+    </div>
+
+    <div id="messages"></div>
+
+    <div class="inputRow">
+      <input type="text" id="message" placeholder="Type a message..." />
+      <button onclick="sendMessage()">Send</button>
+    </div>
+
+  </div>
+
+</div>
+
+</body>
 <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
 
 <script>
@@ -180,5 +200,5 @@ window.goAdmin = function () {
 };
   });
 </script>
-</body>
+
 </html>
