@@ -27,7 +27,8 @@
     );
 
     const messagesDiv = document.getElementById("messages");
-    const input = document.getElementById("message");
+     const input = document.getElementById("message");
+if (!input) return;
 
     const user = localStorage.getItem("user");
 
