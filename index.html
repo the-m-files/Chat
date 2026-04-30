@@ -8,7 +8,7 @@
 <body>
 
 <h2>OHA Chat</h2>
-<h3>Online Users</h3>
+<h3 class="Online-Users">Online Users</h3>
 <div id="onlineUsers"></div>
 <button onclick="logout()">Logout</button>
 <button onclick="goAdmin()">Admin</button>
@@ -170,7 +170,14 @@
     loadMessages();
 
     input.focus();
+window.logout = function () {
+  localStorage.removeItem("user");
+  window.location.href = "login.html";
+};
 
+window.goAdmin = function () {
+  window.location.href = "admin.html";
+};
   });
 </script>
 </body>

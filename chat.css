@@ -66,3 +66,10 @@
   color: red;
   font-weight: bold;
 }
+
+.Online-users{
+align-self:center;
+border-width:10px;
+border-style:solid;
+border-color:black;
+}
