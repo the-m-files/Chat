@@ -161,6 +161,12 @@
         .eq("username", user)
         .single();
 
+      // ❌ another session took over
+      if (data && data.session_id && data.session_id !== sessionId) {
+        window.location.href = "index.html";
+        return;
+      }
+
       await sb
         .from("users")
         .update({
