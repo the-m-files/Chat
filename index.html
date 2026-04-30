@@ -266,7 +266,37 @@ setInterval(loadOnlineUsers, 1200);
     loadMessages();
 
     input.focus();
+const sessionId = Math.random().toString(36);
 
+localStorage.setItem("sessionId", sessionId);
+async function updateLastSeen() {
+  const currentSession = localStorage.getItem("sessionId");
+
+  await sb
+    .from("users")
+    .update({
+      last_seen: new Date().toISOString(),
+      session_id: currentSession
+    })
+    .eq("username", user);
+}
+sb.channel("session-check")
+  .on("postgres_changes", {
+    event: "UPDATE",
+    schema: "public",
+    table: "users"
+  }, payload => {
+    if (payload.new.username === user) {
+      const mySession = localStorage.getItem("sessionId");
+
+      if (payload.new.session_id !== mySession) {
+        alert("You logged in somewhere else");
+        localStorage.clear();
+        window.location.href = "login.html";
+      }
+    }
+  })
+  .subscribe();
   });
 </script>
 </html>
