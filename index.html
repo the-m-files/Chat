@@ -161,13 +161,10 @@
         .eq("username", user)
         .single();
 
-      // ❌ another session took over
-      if (data && data.session_id && data.session_id !== sessionId) {
-        alert("Logged in somewhere else");
-        localStorage.clear();
-        window.location.href = "index.html";
-        return;
-      }
+      // ✅ allow multiple tabs, just overwrite session safely
+if (data && data.session_id && data.session_id !== sessionId) {
+  console.log("Another session detected, continuing anyway.");
+}
 
       await sb
         .from("users")
