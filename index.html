@@ -177,9 +177,8 @@
   data.forEach(u => {
     if (!u.last_seen) return;
 
-    const last = new Date(u.last_seen).getTime();
-    const diff = now - last;
-
+    const diff = Date.now() - Date.parse(u.last_seen + "Z");
+const isOnline = diff < 3000;
     // 🔥 STRONGER cutoff
     const isOnline = diff < 3000;
 
