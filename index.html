@@ -28,6 +28,33 @@
 }
 setInterval(updateLastSeen, 5000);
 updateLastSeen();
+async function loadOnlineUsers() {
+  const { data } = await sb
+    .from("users")
+    .select("username, last_seen");
+
+  if (!data) return;
+
+  const now = new Date();
+
+  const container = document.getElementById("onlineUsers");
+  container.innerHTML = "";
+
+  data.forEach(u => {
+    const lastSeen = new Date(u.last_seen);
+    const diff = (now - lastSeen) / 1000;
+
+    const isOnline = diff < 10; // active within 10 sec
+
+    const div = document.createElement("div");
+    div.textContent = `${isOnline ? "🟢" : "⚫"} ${u.username}`;
+
+    container.appendChild(div);
+  });
+}
+setInterval(loadOnlineUsers, 5000);
+loadOnlineUsers();
+
   document.addEventListener("DOMContentLoaded", () => {
 
     const sb = window.supabase.createClient(
