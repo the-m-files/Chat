@@ -20,41 +20,6 @@
 <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
 
 <script>
-  async function updateLastSeen() {
-  await sb
-    .from("users")
-    .update({ last_seen: new Date().toISOString() })
-    .eq("username", user);
-}
-setInterval(updateLastSeen, 5000);
-updateLastSeen();
-async function loadOnlineUsers() {
-  const { data } = await sb
-    .from("users")
-    .select("username, last_seen");
-
-  if (!data) return;
-
-  const now = new Date();
-
-  const container = document.getElementById("onlineUsers");
-  container.innerHTML = "";
-
-  data.forEach(u => {
-    const lastSeen = new Date(u.last_seen);
-    const diff = (now - lastSeen) / 1000;
-
-    const isOnline = diff < 10; // active within 10 sec
-
-    const div = document.createElement("div");
-    div.textContent = `${isOnline ? "🟢" : "⚫"} ${u.username}`;
-
-    container.appendChild(div);
-  });
-}
-setInterval(loadOnlineUsers, 5000);
-loadOnlineUsers();
-
   document.addEventListener("DOMContentLoaded", () => {
 
     const sb = window.supabase.createClient(
@@ -63,81 +28,62 @@ loadOnlineUsers();
     );
 
     const messagesDiv = document.getElementById("messages");
-     const input = document.getElementById("message");
-if (!input) return;
+    const input = document.getElementById("message");
+    const onlineDiv = document.getElementById("onlineUsers");
+
+    if (!messagesDiv || !input || !onlineDiv) return;
 
     const user = localStorage.getItem("user");
-
-    // 🔒 Redirect immediately if not logged in
     if (!user) {
       window.location.href = "login.html";
       return;
     }
 
-    // ⭐ Special usernames
     const specialUsers = {
       "lemony !! 🍋 💖": "special",
       "Mahathish": "admin",
       "CoolKid": "rainbow"
     };
 
-    // 🚫 Check user status (banned / deleted)
+    // 🔒 Check user
     async function checkUserStatus() {
-      const { data, error } = await sb
+      const { data } = await sb
         .from("users")
         .select("*")
         .eq("username", user)
         .single();
 
-      if (error || !data) {
-        alert("Account removed");
+      if (!data || data.banned) {
+        alert("Session ended");
         localStorage.removeItem("user");
         window.location.href = "login.html";
         return false;
       }
-
-      if (data.banned) {
-        alert("You are banned");
-        localStorage.removeItem("user");
-        window.location.href = "login.html";
-        return false;
-      }
-
       return true;
     }
 
     // 📥 Load messages
     async function loadMessages() {
-      const { data, error } = await sb
+      const { data } = await sb
         .from("oha_chat")
         .select("*")
         .order("created_at", { ascending: true });
 
-      if (error || !data) {
-        console.error("Load error:", error);
-        return;
-      }
+      if (!data) return;
 
       messagesDiv.innerHTML = "";
       data.forEach(renderMessage);
       messagesDiv.scrollTop = messagesDiv.scrollHeight;
     }
 
-    // 💬 Render message
     function renderMessage(msg) {
       const div = document.createElement("div");
-      div.className = "msg";
-
-      const extraClass = specialUsers[msg.name] || "";
-
-      div.innerHTML = `
-        <span class="name ${extraClass}">${msg.name}:</span> ${msg.message}
-      `;
-
+      const extra = specialUsers[msg.name] || "";
+      div.innerHTML = `<span class="name ${extra}">${msg.name}:</span> ${msg.message}`;
       messagesDiv.appendChild(div);
     }
 
-    // 📤 Send message
+    // 📤 Send
     async function sendMessage() {
       const message = input.value.trim();
       if (!message) return;
@@ -145,19 +91,13 @@ if (!input) return;
       const ok = await checkUserStatus();
       if (!ok) return;
 
-      const { error } = await sb.from("oha_chat").insert([
-        { name: user, message }
-      ]);
-
-      if (error) {
-        console.error("Send error:", error);
-        return;
-      }
-
+      await sb.from("oha_chat").insert([{ name: user, message }]);
       input.value = "";
     }
 
-    // ⌨️ Enter to send (FIXED)
+    window.sendMessage = sendMessage;
+
+    // ⌨️ Enter
     input.addEventListener("keydown", (e) => {
       if (e.key === "Enter") {
         e.preventDefault();
@@ -165,18 +105,47 @@ if (!input) return;
       }
     });
 
-    // 🔄 Realtime updates (insert/delete/clear)
+    // =========================
+    // 🟢 ONLINE USERS SYSTEM
+    // =========================
+
+    async function updateLastSeen() {
+      await sb
+        .from("users")
+        .update({ last_seen: new Date().toISOString() })
+        .eq("username", user);
+    }
+
+    async function loadOnlineUsers() {
+      const { data } = await sb
+        .from("users")
+        .select("username, last_seen");
+
+      if (!data) return;
+
+      const now = new Date();
+      onlineDiv.innerHTML = "";
+
+      data.forEach(u => {
+        const last = new Date(u.last_seen);
+        const isOnline = (now - last) < 10000;
+
+        const div = document.createElement("div");
+        div.textContent = `${isOnline ? "🟢" : "⚫"} ${u.username}`;
+        onlineDiv.appendChild(div);
+      });
+    }
+
+    // 🔄 Realtime chat
     sb.channel("chat")
       .on("postgres_changes", {
         event: "*",
         schema: "public",
         table: "oha_chat"
-      }, () => {
-        loadMessages();
-      })
+      }, loadMessages)
       .subscribe();
 
-    // 🚫 Realtime ban / delete detection
+    // 🚫 Realtime user changes
     sb.channel("users-watch")
       .on("postgres_changes", {
         event: "*",
@@ -191,26 +160,17 @@ if (!input) return;
       })
       .subscribe();
 
-    // 🚪 Logout
-    window.logout = function () {
-      localStorage.removeItem("user");
-      window.location.href = "login.html";
-    };
+    // 🔁 Timers
+    setInterval(updateLastSeen, 5000);
+    setInterval(loadOnlineUsers, 5000);
 
-    // 👑 Admin panel
-    window.goAdmin = function () {
-      window.location.href = "admin.html";
-    };
-
-    // 🚀 Init
+    updateLastSeen();
+    loadOnlineUsers();
     loadMessages();
-    input.focus();
 
-    // 🔁 Safety check every 5s
-    setInterval(checkUserStatus, 5000);
+    input.focus();
 
   });
 </script>
-
 </body>
 </html>
