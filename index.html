@@ -40,6 +40,8 @@
 </body>
 <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
 
+<script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+
 <script>
   document.addEventListener("DOMContentLoaded", () => {
 
@@ -173,11 +175,10 @@
 
       data.forEach(u => {
         const last = u.last_seen ? new Date(u.last_seen).getTime() : 0;
-        const isOnline = (now - last) < 4000;
+        const isOnline = (now - last) < 2500; // 🔥 tighter window
 
         const wasOnline = userStatusMap[u.username];
 
-        // 🚫 Skip spam on first load
         if (!firstLoad) {
           if (isOnline && !wasOnline) {
             addSystemMessage(`🟢 ${u.username} joined the chat`);
@@ -197,7 +198,7 @@
       firstLoad = false;
     }
 
-    // 🔥 Activity-based updates (IMPORTANT)
+    // 🔥 Activity-based presence
     document.addEventListener("mousemove", updateLastSeen);
     document.addEventListener("keydown", updateLastSeen);
 
@@ -241,8 +242,8 @@
     // =========================
     // 🚀 START
     // =========================
-    setInterval(updateLastSeen, 2000);
-    setInterval(loadOnlineUsers, 2000);
+    setInterval(updateLastSeen, 1500);
+    setInterval(loadOnlineUsers, 1500);
 
     updateLastSeen();
     loadOnlineUsers();
