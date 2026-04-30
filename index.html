@@ -163,45 +163,61 @@
         .eq("username", user);
     }
 
-    async function loadOnlineUsers() {
-      const { data } = await sb
-        .from("users")
-        .select("username, last_seen");
+  async function loadOnlineUsers() {
+  const { data, error } = await sb
+    .from("users")
+    .select("username, last_seen")
+    .order("username", { ascending: true });
 
-      if (!data) return;
+  if (error || !data) return;
 
-      const now = Date.now();
-      onlineDiv.innerHTML = "";
+  const now = Date.now();
+  onlineDiv.innerHTML = "";
 
-      data.forEach(u => {
-        const last = u.last_seen ? new Date(u.last_seen).getTime() : 0;
-        const isOnline = (now - last) < 2500; // 🔥 tighter window
+  data.forEach(u => {
+    if (!u.last_seen) return;
 
-        const wasOnline = userStatusMap[u.username];
+    const last = new Date(u.last_seen).getTime();
+    const diff = now - last;
 
-        if (!firstLoad) {
-          if (isOnline && !wasOnline) {
-            addSystemMessage(`🟢 ${u.username} joined the chat`);
-          }
-          if (!isOnline && wasOnline) {
-            addSystemMessage(`🔴 ${u.username} left the chat`);
-          }
-        }
+    // 🔥 STRONGER cutoff
+    const isOnline = diff < 3000;
 
-        userStatusMap[u.username] = isOnline;
+    const wasOnline = userStatusMap[u.username];
 
-        const div = document.createElement("div");
-        div.textContent = `${isOnline ? "🟢" : "⚫"} ${u.username}`;
-        onlineDiv.appendChild(div);
-      });
-
-      firstLoad = false;
+    // 🔔 Join/Leave detection
+    if (!firstLoad) {
+      if (isOnline && !wasOnline) {
+        addSystemMessage(`🟢 ${u.username} joined the chat`);
+      }
+      if (!isOnline && wasOnline) {
+        addSystemMessage(`🔴 ${u.username} left the chat`);
+      }
     }
+
+    userStatusMap[u.username] = isOnline;
+
+    const div = document.createElement("div");
+    div.textContent = `${isOnline ? "🟢" : "⚫"} ${u.username}`;
+    onlineDiv.appendChild(div);
+  });
+
+  firstLoad = false;
+
+  // 🧹 SAFETY: force cleanup of stale users
+  Object.keys(userStatusMap).forEach(name => {
+    const userData = data.find(u => u.username === name);
+    if (!userData) {
+      userStatusMap[name] = false;
+    }
+  });
+}
 
     // 🔥 Activity-based presence
     document.addEventListener("mousemove", updateLastSeen);
     document.addEventListener("keydown", updateLastSeen);
-
+setInterval(updateLastSeen, 1200);
+setInterval(loadOnlineUsers, 1200);
     // =========================
     // 🔄 REALTIME
     // =========================
