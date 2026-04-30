@@ -161,14 +161,6 @@
         .eq("username", user)
         .single();
 
-      // ❌ another session took over
-      if (data && data.session_id && data.session_id !== sessionId) {
-        alert("Logged in somewhere else");
-        localStorage.clear();
-        window.location.href = "login.html";
-        return;
-      }
-
       await sb
         .from("users")
         .update({
