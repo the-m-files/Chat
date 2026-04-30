@@ -60,13 +60,16 @@
       return;
     }
 
+    // ⭐ Special users
     const specialUsers = {
       "lemony !! 🍋 💖": "special",
       "Mahathish": "admin",
       "CoolKid": "rainbow"
     };
 
-    // 🔒 Check user
+    // =========================
+    // 🔒 USER CHECK
+    // =========================
     async function checkUserStatus() {
       const { data } = await sb
         .from("users")
@@ -83,7 +86,9 @@
       return true;
     }
 
-    // 📥 Load messages
+    // =========================
+    // 💬 MESSAGES
+    // =========================
     async function loadMessages() {
       const { data } = await sb
         .from("oha_chat")
@@ -100,11 +105,25 @@
     function renderMessage(msg) {
       const div = document.createElement("div");
       const extra = specialUsers[msg.name] || "";
-      div.innerHTML = `<span class="name ${extra}">${msg.name}:</span> ${msg.message}`;
+
+      div.innerHTML = `
+        <span class="name ${extra}">${msg.name}:</span> ${msg.message}
+      `;
+
       messagesDiv.appendChild(div);
     }
 
-    // 📤 Send
+    function addSystemMessage(text) {
+      const div = document.createElement("div");
+      div.className = "system";
+      div.textContent = text;
+      messagesDiv.appendChild(div);
+      messagesDiv.scrollTop = messagesDiv.scrollHeight;
+    }
+
+    // =========================
+    // 📤 SEND MESSAGE
+    // =========================
     async function sendMessage() {
       const message = input.value.trim();
       if (!message) return;
@@ -112,13 +131,16 @@
       const ok = await checkUserStatus();
       if (!ok) return;
 
-      await sb.from("oha_chat").insert([{ name: user, message }]);
+      await sb.from("oha_chat").insert([
+        { name: user, message }
+      ]);
+
       input.value = "";
     }
 
     window.sendMessage = sendMessage;
 
-    // ⌨️ Enter
+    // ⌨️ ENTER KEY
     input.addEventListener("keydown", (e) => {
       if (e.key === "Enter") {
         e.preventDefault();
@@ -127,8 +149,10 @@
     });
 
     // =========================
-    // 🟢 ONLINE USERS SYSTEM
+    // 🟢 ONLINE SYSTEM (FAST)
     // =========================
+    let userStatusMap = {};
+    let firstLoad = true;
 
     async function updateLastSeen() {
       await sb
@@ -144,20 +168,42 @@
 
       if (!data) return;
 
-      const now = new Date();
+      const now = Date.now();
       onlineDiv.innerHTML = "";
 
       data.forEach(u => {
-        const last = new Date(u.last_seen);
-        const isOnline = (now - last) < 10000;
+        const last = u.last_seen ? new Date(u.last_seen).getTime() : 0;
+        const isOnline = (now - last) < 4000;
+
+        const wasOnline = userStatusMap[u.username];
+
+        // 🚫 Skip spam on first load
+        if (!firstLoad) {
+          if (isOnline && !wasOnline) {
+            addSystemMessage(`🟢 ${u.username} joined the chat`);
+          }
+          if (!isOnline && wasOnline) {
+            addSystemMessage(`🔴 ${u.username} left the chat`);
+          }
+        }
+
+        userStatusMap[u.username] = isOnline;
 
         const div = document.createElement("div");
         div.textContent = `${isOnline ? "🟢" : "⚫"} ${u.username}`;
         onlineDiv.appendChild(div);
       });
+
+      firstLoad = false;
     }
 
-    // 🔄 Realtime chat
+    // 🔥 Activity-based updates (IMPORTANT)
+    document.addEventListener("mousemove", updateLastSeen);
+    document.addEventListener("keydown", updateLastSeen);
+
+    // =========================
+    // 🔄 REALTIME
+    // =========================
     sb.channel("chat")
       .on("postgres_changes", {
         event: "*",
@@ -166,7 +212,6 @@
       }, loadMessages)
       .subscribe();
 
-    // 🚫 Realtime user changes
     sb.channel("users-watch")
       .on("postgres_changes", {
         event: "*",
@@ -181,24 +226,30 @@
       })
       .subscribe();
 
-    // 🔁 Timers
-    setInterval(updateLastSeen, 5000);
-    setInterval(loadOnlineUsers, 5000);
+    // =========================
+    // 🚪 GLOBAL BUTTONS
+    // =========================
+    window.logout = function () {
+      localStorage.removeItem("user");
+      window.location.href = "login.html";
+    };
+
+    window.goAdmin = function () {
+      window.location.href = "admin.html";
+    };
+
+    // =========================
+    // 🚀 START
+    // =========================
+    setInterval(updateLastSeen, 2000);
+    setInterval(loadOnlineUsers, 2000);
 
     updateLastSeen();
     loadOnlineUsers();
     loadMessages();
 
     input.focus();
-window.logout = function () {
-  localStorage.removeItem("user");
-  window.location.href = "login.html";
-};
 
-window.goAdmin = function () {
-  window.location.href = "admin.html";
-};
   });
 </script>
-
 </html>
