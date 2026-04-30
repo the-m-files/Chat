@@ -7,7 +7,8 @@
 <body>
 
 <h2>OHA Chat</h2>
-
+<h3>Online Users</h3>
+<div id="onlineUsers"></div>
 <button onclick="logout()">Logout</button>
 <button onclick="goAdmin()">Admin</button>
 
@@ -19,6 +20,14 @@
 <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
 
 <script>
+  async function updateLastSeen() {
+  await sb
+    .from("users")
+    .update({ last_seen: new Date().toISOString() })
+    .eq("username", user);
+}
+setInterval(updateLastSeen, 5000);
+updateLastSeen();
   document.addEventListener("DOMContentLoaded", () => {
 
     const sb = window.supabase.createClient(
