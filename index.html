@@ -37,9 +37,6 @@
 
 </div>
 
-</body>
-<script src="https://unpkg.com/@supabase/supabase-js@2"></script>
-
 <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
 
 <script>
@@ -54,12 +51,17 @@
     const input = document.getElementById("message");
     const onlineDiv = document.getElementById("onlineUsers");
 
-    if (!messagesDiv || !input || !onlineDiv) return;
-
     const user = localStorage.getItem("user");
     if (!user) {
       window.location.href = "login.html";
       return;
+    }
+
+    // 🔒 SESSION SYSTEM (prevents ghost users)
+    let sessionId = localStorage.getItem("sessionId");
+    if (!sessionId) {
+      sessionId = Math.random().toString(36);
+      localStorage.setItem("sessionId", sessionId);
     }
 
     // ⭐ Special users
@@ -81,7 +83,7 @@
 
       if (!data || data.banned) {
         alert("Session ended");
-        localStorage.removeItem("user");
+        localStorage.clear();
         window.location.href = "login.html";
         return false;
       }
@@ -107,11 +109,7 @@
     function renderMessage(msg) {
       const div = document.createElement("div");
       const extra = specialUsers[msg.name] || "";
-
-      div.innerHTML = `
-        <span class="name ${extra}">${msg.name}:</span> ${msg.message}
-      `;
-
+      div.innerHTML = `<span class="name ${extra}">${msg.name}:</span> ${msg.message}`;
       messagesDiv.appendChild(div);
     }
 
@@ -151,102 +149,109 @@
     });
 
     // =========================
-    // 🟢 ONLINE SYSTEM (FAST)
+    // 🟢 ONLINE SYSTEM
     // =========================
     let userStatusMap = {};
     let firstLoad = true;
 
     async function updateLastSeen() {
+      const { data } = await sb
+        .from("users")
+        .select("session_id")
+        .eq("username", user)
+        .single();
+
+      // ❌ another session took over
+      if (data && data.session_id && data.session_id !== sessionId) {
+        alert("Logged in somewhere else");
+        localStorage.clear();
+        window.location.href = "login.html";
+        return;
+      }
+
       await sb
         .from("users")
-        .update({ last_seen: new Date().toISOString() })
+        .update({
+          last_seen: new Date().toISOString(),
+          session_id: sessionId
+        })
         .eq("username", user);
     }
 
-  async function loadOnlineUsers() {
-  const { data, error } = await sb
-    .from("users")
-    .select("username, last_seen")
-    .order("username", { ascending: true });
+    async function loadOnlineUsers() {
+      const { data } = await sb
+        .from("users")
+        .select("username, last_seen");
 
-  if (error || !data) return;
+      if (!data) return;
 
-  const now = Date.now();
-  onlineDiv.innerHTML = "";
+      const now = Date.now();
+      onlineDiv.innerHTML = "";
 
-  data.forEach(u => {
-    if (!u.last_seen) return;
+      data.forEach(u => {
+        if (!u.last_seen) return;
 
-    const diff = Date.now() - Date.parse(u.last_seen + "Z");
-const isOnline = diff < 3000;
-    // 🔥 STRONGER cutoff
-    const isOnline = diff < 3000;
+        const diff = now - Date.parse(u.last_seen + "Z"); // 🔥 timezone fix
+        const isOnline = diff < 3000;
 
-    const wasOnline = userStatusMap[u.username];
+        const wasOnline = userStatusMap[u.username];
 
-    // 🔔 Join/Leave detection
-    if (!firstLoad) {
-      if (isOnline && !wasOnline) {
-        addSystemMessage(`🟢 ${u.username} joined the chat`);
-      }
-      if (!isOnline && wasOnline) {
-        addSystemMessage(`🔴 ${u.username} left the chat`);
-      }
+        if (!firstLoad) {
+          if (isOnline && !wasOnline) {
+            addSystemMessage(`🟢 ${u.username} joined the chat`);
+          }
+          if (!isOnline && wasOnline) {
+            addSystemMessage(`🔴 ${u.username} left the chat`);
+          }
+        }
+
+        userStatusMap[u.username] = isOnline;
+
+        const div = document.createElement("div");
+        div.textContent = `${isOnline ? "🟢" : "⚫"} ${u.username}`;
+        onlineDiv.appendChild(div);
+      });
+
+      firstLoad = false;
     }
 
-    userStatusMap[u.username] = isOnline;
-
-    const div = document.createElement("div");
-    div.textContent = `${isOnline ? "🟢" : "⚫"} ${u.username}`;
-    onlineDiv.appendChild(div);
-  });
-
-  firstLoad = false;
-
-  // 🧹 SAFETY: force cleanup of stale users
-  Object.keys(userStatusMap).forEach(name => {
-    const userData = data.find(u => u.username === name);
-    if (!userData) {
-      userStatusMap[name] = false;
-    }
-  });
-}
-
-    // 🔥 Activity-based presence
+    // Activity tracking
     document.addEventListener("mousemove", updateLastSeen);
     document.addEventListener("keydown", updateLastSeen);
-setInterval(updateLastSeen, 1200);
-setInterval(loadOnlineUsers, 1200);
+
     // =========================
     // 🔄 REALTIME
     // =========================
     sb.channel("chat")
       .on("postgres_changes", {
-        event: "*",
+        event: "INSERT",
         schema: "public",
         table: "oha_chat"
-      }, loadMessages)
+      }, payload => {
+        renderMessage(payload.new);
+        messagesDiv.scrollTop = messagesDiv.scrollHeight;
+      })
       .subscribe();
 
     sb.channel("users-watch")
       .on("postgres_changes", {
-        event: "*",
+        event: "UPDATE",
         schema: "public",
         table: "users"
       }, payload => {
-        if (payload.new?.username === user) {
-          alert("Session ended");
-          localStorage.removeItem("user");
+        if (payload.new.username === user && payload.new.banned) {
+          alert("You were banned");
+          localStorage.clear();
           window.location.href = "login.html";
         }
       })
       .subscribe();
 
     // =========================
-    // 🚪 GLOBAL BUTTONS
+    // 🚪 BUTTONS
     // =========================
     window.logout = function () {
-      localStorage.removeItem("user");
+      localStorage.clear();
       window.location.href = "login.html";
     };
 
@@ -257,45 +262,17 @@ setInterval(loadOnlineUsers, 1200);
     // =========================
     // 🚀 START
     // =========================
-    setInterval(updateLastSeen, 1500);
-    setInterval(loadOnlineUsers, 1500);
+    setInterval(updateLastSeen, 1200);
+    setInterval(loadOnlineUsers, 1200);
 
     updateLastSeen();
     loadOnlineUsers();
     loadMessages();
 
     input.focus();
-const sessionId = Math.random().toString(36);
 
-localStorage.setItem("sessionId", sessionId);
-async function updateLastSeen() {
-  const currentSession = localStorage.getItem("sessionId");
-
-  await sb
-    .from("users")
-    .update({
-      last_seen: new Date().toISOString(),
-      session_id: currentSession
-    })
-    .eq("username", user);
-}
-sb.channel("session-check")
-  .on("postgres_changes", {
-    event: "UPDATE",
-    schema: "public",
-    table: "users"
-  }, payload => {
-    if (payload.new.username === user) {
-      const mySession = localStorage.getItem("sessionId");
-
-      if (payload.new.session_id !== mySession) {
-        alert("You logged in somewhere else");
-        localStorage.clear();
-        window.location.href = "login.html";
-      }
-    }
-  })
-  .subscribe();
   });
 </script>
+
+</body>
 </html>
