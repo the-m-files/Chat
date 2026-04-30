@@ -1,21 +1,3 @@
-<!DOCTYPE html>
-<html>
-<head>
-  <title>OHA Chat</title>
-  <link rel="stylesheet" href="chat.css"/>
-</head>
-<body>
-
-<h2>OHA Chat</h2>
-
-<button onclick="logout()">Logout</button>
-<button onclick="goAdmin()">Admin</button>
-
-<div id="messages"></div>
-
-<input type="text" id="message" placeholder="Type a message..." />
-<button onclick="sendMessage()">Send</button>
-
 <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
 
 <script>
@@ -27,7 +9,7 @@
   const messagesDiv = document.getElementById("messages");
   const input = document.getElementById("message");
 
-  // ⭐ SPECIAL USERS (FIXED POSITION)
+  // ⭐ Special users
   const specialUsers = {
     "lemony !! 🍋 💖": "special",
     "Mahathish": "admin",
@@ -40,33 +22,48 @@
     window.location.href = "login.html";
   }
 
-  // 🚫 Check if banned
-  async function checkIfBanned() {
-    const { data } = await sb
+  // 🚫 Check if banned OR deleted
+  async function checkUserStatus() {
+    const { data, error } = await sb
       .from("users")
-      .select("banned")
+      .select("*")
       .eq("username", user)
       .single();
 
-    if (data?.banned) {
+    if (error || !data) {
+      alert("Account removed");
+      localStorage.removeItem("user");
+      window.location.href = "login.html";
+      return false;
+    }
+
+    if (data.banned) {
       alert("You are banned");
       localStorage.removeItem("user");
       window.location.href = "login.html";
+      return false;
     }
+
+    return true;
   }
 
-  checkIfBanned();
+  // run once
+  checkUserStatus();
 
   // 📥 Load messages
   async function loadMessages() {
-    const { data } = await sb
+    const { data, error } = await sb
       .from("oha_chat")
       .select("*")
       .order("created_at", { ascending: true });
 
+    if (error || !data) {
+      console.error("Load error:", error);
+      return;
+    }
+
     messagesDiv.innerHTML = "";
     data.forEach(renderMessage);
-
     messagesDiv.scrollTop = messagesDiv.scrollHeight;
   }
 
@@ -84,85 +81,61 @@
     messagesDiv.appendChild(div);
   }
 
+  // 📤 Send message (FINAL VERSION)
   async function sendMessage() {
-  const message = input.value.trim();
-  if (!message) return;
+    const message = input.value.trim();
+    if (!message) return;
 
-  // 🔒 CHECK BAN BEFORE SENDING
-  const { data } = await sb
-    .from("users")
-    .select("banned")
-    .eq("username", user)
-    .single();
+    const ok = await checkUserStatus();
+    if (!ok) return;
 
-  if (data?.banned) {
-    alert("You are banned");
-    localStorage.removeItem("user");
-    window.location.href = "login.html";
-    return;
-  }
+    const { error } = await sb.from("oha_chat").insert([
+      { name: user, message }
+    ]);
 
-  await sb.from("oha_chat").insert([
-    { name: user, message }
-  ]);
-
-  input.value = "";
-}
-//auto kick when banned
-sb.channel("users-watch")
-  .on("postgres_changes", {
-    event: "UPDATE",
-    schema: "public",
-    table: "users"
-  }, payload => {
-    if (payload.new.username === user && payload.new.banned) {
-      alert("You have been banned");
-      localStorage.removeItem("user");
-      window.location.href = "login.html";
+    if (error) {
+      console.error("Send error:", error);
+      return;
     }
-  })
-  .subscribe();
-  async function sendMessage() {
-  const message = input.value.trim();
-  if (!message) return;
 
-  const { data } = await sb
-    .from("users")
-    .select("*")
-    .eq("username", user)
-    .single();
-
-  // ❌ user no longer exists
-  if (!data) {
-    alert("Account removed");
-    localStorage.removeItem("user");
-    window.location.href = "login.html";
-    return;
+    input.value = "";
   }
 
-  // 🚫 banned
-  if (data.banned) {
-    alert("You are banned");
-    localStorage.removeItem("user");
-    window.location.href = "login.html";
-    return;
-  }
+  // ⌨️ Enter to send (FIXED)
+  input.addEventListener("keydown", function(e) {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      sendMessage();
+    }
+  });
 
-  await sb.from("oha_chat").insert([
-    { name: user, message }
-  ]);
-
-  input.value = "";
-}
-  // 🔄 Realtime updates
+  // 🔄 Realtime messages
   sb.channel("chat")
     .on("postgres_changes", {
-      event: "INSERT",
+      event: "*",
       schema: "public",
       table: "oha_chat"
+    }, () => {
+      loadMessages();
+    })
+    .subscribe();
+
+  // 🚫 Realtime ban / delete detection
+  sb.channel("users-watch")
+    .on("postgres_changes", {
+      event: "*",
+      schema: "public",
+      table: "users"
     }, payload => {
-      renderMessage(payload.new);
-      messagesDiv.scrollTop = messagesDiv.scrollHeight;
+      if (payload.new?.username === user) {
+        if (payload.new.banned) {
+          alert("You have been banned");
+        } else {
+          alert("Account changed");
+        }
+        localStorage.removeItem("user");
+        window.location.href = "login.html";
+      }
     })
     .subscribe();
 
@@ -172,17 +145,16 @@ sb.channel("users-watch")
     window.location.href = "login.html";
   }
 
-  // 👑 Go to admin panel
+  // 👑 Admin panel
   function goAdmin() {
     window.location.href = "admin.html";
   }
 
-  // 🚀 Initial load
+  // 🚀 Init
   loadMessages();
-
-  // 🎯 Focus input
   input.focus();
-</script>
 
-</body>
-</html> 
+  // 🔁 Periodic safety check (every 5s)
+  setInterval(checkUserStatus, 5000);
+
+</script>
