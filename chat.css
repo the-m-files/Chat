@@ -112,9 +112,6 @@ button {
   border: none;
 }
 
-.inputRow button:hover {
-  background: #0056b3;
-}
 
 /* ✨ TEXT STYLES */
 .name { font-weight: 700; color: #444; }
