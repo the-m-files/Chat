@@ -1,160 +1,179 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>OHA Chat</title>
+  <link rel="stylesheet" href="chat.css"/>
+</head>
+<body>
+
+<h2>OHA Chat</h2>
+
+<button onclick="logout()">Logout</button>
+<button onclick="goAdmin()">Admin</button>
+
+<div id="messages"></div>
+
+<input type="text" id="message" placeholder="Type a message..." />
+<button onclick="sendMessage()">Send</button>
+
 <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
 
 <script>
-  const sb = window.supabase.createClient(
-    "https://jtsivhltrbpishfyhfxl.supabase.co",
-    "sb_publishable_K6rHpM-Xy26NF3nlYf7Czg_2mgceKkP"
-  );
+  document.addEventListener("DOMContentLoaded", () => {
 
-  const messagesDiv = document.getElementById("messages");
-  const input = document.getElementById("message");
+    const sb = window.supabase.createClient(
+      "https://jtsivhltrbpishfyhfxl.supabase.co",
+      "sb_publishable_K6rHpM-Xy26NF3nlYf7Czg_2mgceKkP"
+    );
 
-  // ⭐ Special users
-  const specialUsers = {
-    "lemony !! 🍋 💖": "special",
-    "Mahathish": "admin",
-    "CoolKid": "rainbow"
-  };
+    const messagesDiv = document.getElementById("messages");
+    const input = document.getElementById("message");
 
-  // 🔒 Check login
-  const user = localStorage.getItem("user");
-  if (!user) {
-    window.location.href = "login.html";
-  }
+    const user = localStorage.getItem("user");
 
-  // 🚫 Check if banned OR deleted
-  async function checkUserStatus() {
-    const { data, error } = await sb
-      .from("users")
-      .select("*")
-      .eq("username", user)
-      .single();
-
-    if (error || !data) {
-      alert("Account removed");
-      localStorage.removeItem("user");
+    // 🔒 Redirect immediately if not logged in
+    if (!user) {
       window.location.href = "login.html";
-      return false;
-    }
-
-    if (data.banned) {
-      alert("You are banned");
-      localStorage.removeItem("user");
-      window.location.href = "login.html";
-      return false;
-    }
-
-    return true;
-  }
-
-  // run once
-  checkUserStatus();
-
-  // 📥 Load messages
-  async function loadMessages() {
-    const { data, error } = await sb
-      .from("oha_chat")
-      .select("*")
-      .order("created_at", { ascending: true });
-
-    if (error || !data) {
-      console.error("Load error:", error);
       return;
     }
 
-    messagesDiv.innerHTML = "";
-    data.forEach(renderMessage);
-    messagesDiv.scrollTop = messagesDiv.scrollHeight;
-  }
+    // ⭐ Special usernames
+    const specialUsers = {
+      "lemony !! 🍋 💖": "special",
+      "Mahathish": "admin",
+      "CoolKid": "rainbow"
+    };
 
-  // 💬 Render message
-  function renderMessage(msg) {
-    const div = document.createElement("div");
-    div.className = "msg";
+    // 🚫 Check user status (banned / deleted)
+    async function checkUserStatus() {
+      const { data, error } = await sb
+        .from("users")
+        .select("*")
+        .eq("username", user)
+        .single();
 
-    const extraClass = specialUsers[msg.name] || "";
-
-    div.innerHTML = `
-      <span class="name ${extraClass}">${msg.name}:</span> ${msg.message}
-    `;
-
-    messagesDiv.appendChild(div);
-  }
-
-  // 📤 Send message (FINAL VERSION)
-  async function sendMessage() {
-    const message = input.value.trim();
-    if (!message) return;
-
-    const ok = await checkUserStatus();
-    if (!ok) return;
-
-    const { error } = await sb.from("oha_chat").insert([
-      { name: user, message }
-    ]);
-
-    if (error) {
-      console.error("Send error:", error);
-      return;
-    }
-
-    input.value = "";
-  }
-
-  // ⌨️ Enter to send (FIXED)
-  input.addEventListener("keydown", function(e) {
-    if (e.key === "Enter") {
-      e.preventDefault();
-      sendMessage();
-    }
-  });
-
-  // 🔄 Realtime messages
-  sb.channel("chat")
-    .on("postgres_changes", {
-      event: "*",
-      schema: "public",
-      table: "oha_chat"
-    }, () => {
-      loadMessages();
-    })
-    .subscribe();
-
-  // 🚫 Realtime ban / delete detection
-  sb.channel("users-watch")
-    .on("postgres_changes", {
-      event: "*",
-      schema: "public",
-      table: "users"
-    }, payload => {
-      if (payload.new?.username === user) {
-        if (payload.new.banned) {
-          alert("You have been banned");
-        } else {
-          alert("Account changed");
-        }
+      if (error || !data) {
+        alert("Account removed");
         localStorage.removeItem("user");
         window.location.href = "login.html";
+        return false;
       }
-    })
-    .subscribe();
 
-  // 🚪 Logout
-  function logout() {
-    localStorage.removeItem("user");
-    window.location.href = "login.html";
-  }
+      if (data.banned) {
+        alert("You are banned");
+        localStorage.removeItem("user");
+        window.location.href = "login.html";
+        return false;
+      }
 
-  // 👑 Admin panel
-  function goAdmin() {
-    window.location.href = "admin.html";
-  }
+      return true;
+    }
 
-  // 🚀 Init
-  loadMessages();
-  input.focus();
+    // 📥 Load messages
+    async function loadMessages() {
+      const { data, error } = await sb
+        .from("oha_chat")
+        .select("*")
+        .order("created_at", { ascending: true });
 
-  // 🔁 Periodic safety check (every 5s)
-  setInterval(checkUserStatus, 5000);
+      if (error || !data) {
+        console.error("Load error:", error);
+        return;
+      }
 
+      messagesDiv.innerHTML = "";
+      data.forEach(renderMessage);
+      messagesDiv.scrollTop = messagesDiv.scrollHeight;
+    }
+
+    // 💬 Render message
+    function renderMessage(msg) {
+      const div = document.createElement("div");
+      div.className = "msg";
+
+      const extraClass = specialUsers[msg.name] || "";
+
+      div.innerHTML = `
+        <span class="name ${extraClass}">${msg.name}:</span> ${msg.message}
+      `;
+
+      messagesDiv.appendChild(div);
+    }
+
+    // 📤 Send message
+    async function sendMessage() {
+      const message = input.value.trim();
+      if (!message) return;
+
+      const ok = await checkUserStatus();
+      if (!ok) return;
+
+      const { error } = await sb.from("oha_chat").insert([
+        { name: user, message }
+      ]);
+
+      if (error) {
+        console.error("Send error:", error);
+        return;
+      }
+
+      input.value = "";
+    }
+
+    // ⌨️ Enter to send (FIXED)
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        sendMessage();
+      }
+    });
+
+    // 🔄 Realtime updates (insert/delete/clear)
+    sb.channel("chat")
+      .on("postgres_changes", {
+        event: "*",
+        schema: "public",
+        table: "oha_chat"
+      }, () => {
+        loadMessages();
+      })
+      .subscribe();
+
+    // 🚫 Realtime ban / delete detection
+    sb.channel("users-watch")
+      .on("postgres_changes", {
+        event: "*",
+        schema: "public",
+        table: "users"
+      }, payload => {
+        if (payload.new?.username === user) {
+          alert("Session ended");
+          localStorage.removeItem("user");
+          window.location.href = "login.html";
+        }
+      })
+      .subscribe();
+
+    // 🚪 Logout
+    window.logout = function () {
+      localStorage.removeItem("user");
+      window.location.href = "login.html";
+    };
+
+    // 👑 Admin panel
+    window.goAdmin = function () {
+      window.location.href = "admin.html";
+    };
+
+    // 🚀 Init
+    loadMessages();
+    input.focus();
+
+    // 🔁 Safety check every 5s
+    setInterval(checkUserStatus, 5000);
+
+  });
 </script>
+
+</body>
+</html>
