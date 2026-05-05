@@ -21,12 +21,14 @@
     <div class="topbar">
       <h2>OHA Chat</h2>
       <div>
+        <button onclick="goProfile()">Profile</button>
         <button onclick="logout()">Logout</button>
         <button onclick="goAdmin()">Admin</button>
       </div>
     </div>
 
     <div id="messages"></div>
+    <div id="typing"></div>
 
     <div class="inputRow">
       <input type="text" id="message" placeholder="Type a message..." />
@@ -40,9 +42,59 @@
 <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
 
 <script>
+  let userCache = {};
+  async function loadUsers() {
+  const { data } = await sb
+    .from("users")
+    .select("username, avatar_url, color");
+
+  if (!data) return;
+
+  userCache = {};
+  data.forEach(u => {
+    userCache[u.username] = u;
+  });
+}
+  // =========================
+// 🌍 GLOBAL BUTTON FUNCTIONS (FIX)
+// =========================
+
+// 🚪 logout
+window.logout = function () {
+  localStorage.clear();
+  window.location.href = "login.html";
+};
+
+// 🛠 admin
+window.goAdmin = function () {
+  window.location.href = "admin.html";
+};
+
+// 👤 profile
+window.goProfile = function () {
+  window.location.href = "profile.html";
+};
+
+// 🌗 theme toggle
+window.toggleTheme = function () {
+  const current = document.body.getAttribute("data-theme");
+
+  if (current === "light") {
+    document.body.setAttribute("data-theme", "dark");
+    localStorage.setItem("theme", "dark");
+  } else {
+    document.body.setAttribute("data-theme", "light");
+    localStorage.setItem("theme", "light");
+  }
+};
+const savedTheme = localStorage.getItem("theme") || "dark";
+document.body.setAttribute("data-theme", savedTheme);
   document.addEventListener("DOMContentLoaded", () => {
 
-    const sb = window.supabase.createClient(
+    // =========================
+    // 🔌 SUPABASE
+    // =========================
+    window.sb = window.supabase.createClient(
       "https://jtsivhltrbpishfyhfxl.supabase.co",
       "sb_publishable_K6rHpM-Xy26NF3nlYf7Czg_2mgceKkP"
     );
@@ -50,6 +102,7 @@
     const messagesDiv = document.getElementById("messages");
     const input = document.getElementById("message");
     const onlineDiv = document.getElementById("onlineUsers");
+    const typingDiv = document.getElementById("typing");
 
     const user = localStorage.getItem("user");
     if (!user) {
@@ -57,19 +110,14 @@
       return;
     }
 
-    // 🔒 SESSION SYSTEM (prevents ghost users)
+    // =========================
+    // 🔒 SESSION
+    // =========================
     let sessionId = localStorage.getItem("sessionId");
     if (!sessionId) {
       sessionId = Math.random().toString(36);
       localStorage.setItem("sessionId", sessionId);
     }
-
-    // ⭐ Special users
-    const specialUsers = {
-      "lemony !! 🍋 💖": "special",
-      "Mahathish": "admin",
-      "CoolKid": "rainbow"
-    };
 
     // =========================
     // 🔒 USER CHECK
@@ -91,35 +139,114 @@
     }
 
     // =========================
-    // 💬 MESSAGES
+    // 💬 RENDER MESSAGE ELEMENT
+    // =========================
+    async function renderMessageElement(msg) {
+      const div = document.createElement("div");
+      div.className = "msg";
+
+      const { data } = await sb
+        .from("users")
+        .select("avatar_url, color")
+        .eq("username", msg.name)
+        .single();
+
+      const avatar = data?.avatar_url;
+      const color = data?.color || "#ffffff";
+      const fallback = msg.name.charAt(0).toUpperCase();
+
+      const reactions = msg.reactions || {};
+
+      let reactionHTML = "";
+      for (const emoji in reactions) {
+        reactionHTML += `
+          <span class="reaction" onclick="react('${msg.id}','${emoji}')">
+            ${emoji} ${reactions[emoji]}
+          </span>
+        `;
+      }
+
+      const avatarHTML = avatar
+        ? `<img src="${avatar}" class="avatar-img">`
+        : fallback;
+
+      div.innerHTML = `
+        <div style="display:flex; gap:10px; margin-bottom:10px;">
+
+          <div class="avatar">${avatarHTML}</div>
+
+          <div class="msgContent">
+            <b style="color:${color}">${msg.name}</b>
+            <div>${msg.message}</div>
+
+            <div class="reactions">${reactionHTML}</div>
+
+            <div class="react-buttons">
+              <button onclick="react('${msg.id}','👍')">👍</button>
+              <button onclick="react('${msg.id}','😂')">😂</button>
+              <button onclick="react('${msg.id}','🔥')">🔥</button>
+            </div>
+          </div>
+
+        </div>
+      `;
+
+      // 🔥 safe image fallback (NO SYNTAX BUGS)
+      const img = div.querySelector("img");
+      if (img) {
+        img.onerror = () => {
+          img.remove();
+          div.querySelector(".avatar").textContent = fallback;
+        };
+      }
+
+      return div;
+    }
+
+    // =========================
+    // 💬 LOAD MESSAGES (FAST)
     // =========================
     async function loadMessages() {
       const { data } = await sb
         .from("oha_chat")
         .select("*")
-        .order("created_at", { ascending: true });
+.order("created_at", { ascending: true })
+.limit(50)
+
 
       if (!data) return;
 
-      messagesDiv.innerHTML = "";
-      data.forEach(renderMessage);
+      const elements = await Promise.all(
+        data.map(msg => renderMessageElement(msg))
+      );
+
+      messagesDiv.replaceChildren(...elements);
+
       messagesDiv.scrollTop = messagesDiv.scrollHeight;
     }
 
-    function renderMessage(msg) {
-      const div = document.createElement("div");
-      const extra = specialUsers[msg.name] || "";
-      div.innerHTML = `<span class="name ${extra}">${msg.name}:</span> ${msg.message}`;
-      messagesDiv.appendChild(div);
-    }
+    // =========================
+    // 😊 REACTIONS (FIXED)
+    // =========================
+    window.react = async function (id, emoji) {
+      const { data } = await sb
+        .from("oha_chat")
+        .select("reactions")
+        .eq("id", id)
+        .single();
 
-    function addSystemMessage(text) {
-      const div = document.createElement("div");
-      div.className = "system";
-      div.textContent = text;
-      messagesDiv.appendChild(div);
-      messagesDiv.scrollTop = messagesDiv.scrollHeight;
-    }
+      let reactions = data?.reactions || {};
+
+      if (!reactions[emoji]) reactions[emoji] = 0;
+      reactions[emoji]++;
+
+      await sb
+        .from("oha_chat")
+        .update({ reactions })
+        .eq("id", id);
+
+setTimeout(loadMessages, 200);
+    };
 
     // =========================
     // 📤 SEND MESSAGE
@@ -132,15 +259,18 @@
       if (!ok) return;
 
       await sb.from("oha_chat").insert([
-        { name: user, message }
+        { name: user, message, reactions: {} }
       ]);
 
       input.value = "";
+
+      await sb.from("users")
+        .update({ typing: false })
+        .eq("username", user);
     }
 
     window.sendMessage = sendMessage;
 
-    // ⌨️ ENTER KEY
     input.addEventListener("keydown", (e) => {
       if (e.key === "Enter") {
         e.preventDefault();
@@ -149,23 +279,45 @@
     });
 
     // =========================
-    // 🟢 ONLINE SYSTEM
+    // ✍️ TYPING
     // =========================
-    let userStatusMap = {};
-    let firstLoad = true;
+    let typingTimeout;
 
-    async function updateLastSeen() {
+    input.addEventListener("input", async () => {
+      clearTimeout(typingTimeout);
+
+      await sb.from("users")
+        .update({ typing: true })
+        .eq("username", user);
+
+      typingTimeout = setTimeout(async () => {
+        await sb.from("users")
+          .update({ typing: false })
+          .eq("username", user);
+      }, 1500);
+    });
+
+    async function loadTyping() {
       const { data } = await sb
         .from("users")
-        .select("session_id")
-        .eq("username", user)
-        .single();
+        .select("username, typing");
 
-      // ✅ allow multiple tabs, just overwrite session safely
-if (data && data.session_id && data.session_id !== sessionId) {
-  console.log("Another session detected, continuing anyway.");
-}
+      if (!data) return;
 
+      const typingUsers = data
+        .filter(u => u.typing && u.username !== user)
+        .map(u => u.username);
+
+      typingDiv.textContent =
+        typingUsers.length > 0
+          ? typingUsers.join(", ") + " is typing..."
+          : "";
+    }
+
+    // =========================
+    // 🟢 ONLINE SYSTEM
+    // =========================
+    async function updatePresence() {
       await sb
         .from("users")
         .update({
@@ -178,7 +330,7 @@ if (data && data.session_id && data.session_id !== sessionId) {
     async function loadOnlineUsers() {
       const { data } = await sb
         .from("users")
-        .select("username, last_seen");
+        .select("username, last_seen, session_id");
 
       if (!data) return;
 
@@ -186,89 +338,117 @@ if (data && data.session_id && data.session_id !== sessionId) {
       onlineDiv.innerHTML = "";
 
       data.forEach(u => {
-        if (!u.last_seen) return;
-
-        const diff = now - Date.parse(u.last_seen + "Z"); // 🔥 timezone fix
-        const isOnline = diff < 3000;
-
-        const wasOnline = userStatusMap[u.username];
-
-        if (!firstLoad) {
-          if (isOnline && !wasOnline) {
-            addSystemMessage(`🟢 ${u.username} joined the chat`);
-          }
-          if (!isOnline && wasOnline) {
-            addSystemMessage(`🔴 ${u.username} left the chat`);
-          }
+        if (!u.last_seen || !u.session_id) {
+          showUser(u.username, false);
+          return;
         }
 
-        userStatusMap[u.username] = isOnline;
+        const diff = now - Date.parse(u.last_seen + "Z");
 
-        const div = document.createElement("div");
-        div.textContent = `${isOnline ? "🟢" : "⚫"} ${u.username}`;
-        onlineDiv.appendChild(div);
+        const isOnline =
+          diff < 2500 &&
+          typeof u.session_id === "string" &&
+          u.session_id.length > 5;
+
+        showUser(u.username, isOnline);
       });
-
-      firstLoad = false;
     }
 
-    // Activity tracking
-    document.addEventListener("mousemove", updateLastSeen);
-    document.addEventListener("keydown", updateLastSeen);
+    function showUser(name, isOnline) {
+      const div = document.createElement("div");
+      div.textContent = `${isOnline ? "🟢" : "⚫"} ${name}`;
+      onlineDiv.appendChild(div);
+    }
+
+    // =========================
+    // 🧹 FORCE OFFLINE
+    // =========================
+    window.addEventListener("pagehide", () => {
+      navigator.sendBeacon(
+        `https://jtsivhltrbpishfyhfxl.supabase.co/rest/v1/users?username=eq.${user}`,
+        new Blob([JSON.stringify({
+          session_id: null,
+          last_seen: null
+        })], { type: "application/json" })
+      );
+    });
 
     // =========================
     // 🔄 REALTIME
     // =========================
-    sb.channel("chat")
-      .on("postgres_changes", {
-        event: "INSERT",
-        schema: "public",
-        table: "oha_chat"
-      }, payload => {
-        renderMessage(payload.new);
-        messagesDiv.scrollTop = messagesDiv.scrollHeight;
-      })
-      .subscribe();
+<!--    sb.channel("chat")-->
+<!--      .on("postgres_changes", {-->
+<!--        event: "*",-->
+<!--        schema: "public",-->
+<!--        table: "oha_chat"-->
+<!--      }, loadMessages)-->
+<!--      .subscribe();-->
 
-    sb.channel("users-watch")
-      .on("postgres_changes", {
-        event: "UPDATE",
-        schema: "public",
-        table: "users"
-      }, payload => {
-        if (payload.new.username === user && payload.new.banned) {
-          alert("You were banned");
-          localStorage.clear();
-          window.location.href = "login.html";
-        }
-      })
-      .subscribe();
+   sb.channel("chat")
+  .on("postgres_changes", {
+    event: "INSERT",
+    schema: "public",
+    table: "oha_chat"
+  }, async (payload) => {
+    const el = await renderMessageElement(payload.new);
+    messagesDiv.appendChild(el);
+    messagesDiv.scrollTop = messagesDiv.scrollHeight;
+  })
+  .subscribe();
 
-    // =========================
-    // 🚪 BUTTONS
-    // =========================
-    window.logout = function () {
-      localStorage.clear();
-      window.location.href = "login.html";
-    };
-
-    window.goAdmin = function () {
-      window.location.href = "admin.html";
-    };
 
     // =========================
     // 🚀 START
     // =========================
-    setInterval(updateLastSeen, 1200);
+    setInterval(updatePresence, 1000);
     setInterval(loadOnlineUsers, 1200);
+    setInterval(loadTyping, 1000);
 
-    updateLastSeen();
+    updatePresence();
     loadOnlineUsers();
+    loadTyping();
     loadMessages();
-
     input.focus();
 
   });
+
+  // =========================
+  // 📷 AVATAR UPLOAD
+  // =========================
+  window.uploadAvatar = async function () {
+    const user = localStorage.getItem("user");
+    const fileInput = document.getElementById("avatarUpload");
+    const file = fileInput.files[0];
+
+    if (!file) {
+      alert("Pick an image first");
+      return;
+    }
+
+    const filePath = `${user}-${Date.now()}.png`;
+
+    const { error } = await sb.storage
+      .from("avatars")
+      .upload(filePath, file);
+
+    if (error) {
+      console.error(error);
+      alert("Upload failed");
+      return;
+    }
+
+    const { data } = sb.storage
+      .from("avatars")
+      .getPublicUrl(filePath);
+
+    await sb
+      .from("users")
+      .update({ avatar_url: data.publicUrl })
+      .eq("username", user);
+
+    alert("Avatar updated!");
+    location.reload();
+  };
 </script>
 
 </body>

@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Profile</title>
+ <link rel="stylesheet" href="chat.css">
+</head>
+<body>
+
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Profile</title>
+    <link rel="stylesheet" href="login.css">
+</head>
+
+<body>
+
+<h2>OHA Chat</h2>
+
+<div class="box">
+
+    <!-- 🖼 Avatar -->
+    <div class="profile-avatar" id="profileAvatar"></div>
+
+    <!-- 👤 Username -->
+    <h3 id="profileName"></h3>
+
+    <!-- 🎨 Color -->
+    <input type="color" id="colorPicker">
+    <p>Color Picker For UserName</p>
+
+    <!-- 📷 Upload -->
+    <input type="file" id="avatarUpload">
+
+    <!-- 💾 Save -->
+    <button onclick="saveProfile()">Save</button>
+
+    <!-- 🔙 Back -->
+    <button onclick="goBack()">Back</button>
+
+</div>
+
+</body>
+</html>
+<script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+
+<script>
+    const sb = window.supabase.createClient(
+      "https://jtsivhltrbpishfyhfxl.supabase.co",
+      "sb_publishable_K6rHpM-Xy26NF3nlYf7Czg_2mgceKkP"
+    );
+
+    const user = localStorage.getItem("user");
+    if (!user) location.href = "login.html";
+
+    // =========================
+    // LOAD PROFILE
+    // =========================
+    async function loadProfile() {
+      const { data } = await sb
+        .from("users")
+        .select("avatar_url, color")
+        .eq("username", user)
+        .single();
+
+      document.getElementById("profileName").textContent = user;
+
+      const avatarDiv = document.getElementById("profileAvatar");
+
+      if (data?.avatar_url) {
+        avatarDiv.innerHTML = `<img src="${data.avatar_url}">`;
+      } else {
+        avatarDiv.textContent = user[0].toUpperCase();
+      }
+
+      if (data?.color) {
+        document.getElementById("colorPicker").value = data.color;
+        document.getElementById("colorPreview").style.background = data.color;
+        document.getElementById("profileName").style.color = data.color;
+      }
+    }
+
+    // =========================
+    // SAVE PROFILE
+    // =========================
+    async function saveProfile() {
+      const color = document.getElementById("colorPicker").value;
+      const file = document.getElementById("avatarUpload").files[0];
+
+      let avatarUrl = null;
+
+      if (file) {
+        const filePath = `${user}-${Date.now()}.png`;
+
+        const { error } = await sb.storage
+          .from("avatars")
+          .upload(filePath, file);
+
+        if (error) {
+          alert("Upload failed");
+          console.error(error);
+          return;
+        }
+
+        const { data } = sb.storage
+          .from("avatars")
+          .getPublicUrl(filePath);
+
+        avatarUrl = data.publicUrl;
+      }
+
+      const updateData = { color };
+      if (avatarUrl) updateData.avatar_url = avatarUrl;
+
+      await sb
+        .from("users")
+        .update(updateData)
+        .eq("username", user);
+
+      alert("Profile updated!");
+      loadProfile();
+    }
+
+    // =========================
+    // NAV
+    // =========================
+    function goBack() {
+      window.location.href = "index.html";
+    }
+
+    loadProfile();
+</script>
+
+</body>
+</html>
