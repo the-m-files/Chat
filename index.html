@@ -21,9 +21,9 @@
     <div class="topbar">
       <h2>OHA Chat</h2>
       <div>
-        <button onclick="goProfile()">Profile</button>
-        <button onclick="logout()">Logout</button>
-        <button onclick="goAdmin()">Admin</button>
+        <button id="profileBtn">Profile</button>
+        <button id="logoutBtn">Logout</button>
+        <button id="adminBtn">Admin</button>
       </div>
     </div>
 
@@ -42,8 +42,59 @@
 <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
 
 <script>
-  let userCache = {};
-  async function loadUsers() {
+
+
+  document.addEventListener("DOMContentLoaded", async () => {
+      let userCache = {};
+    // =========================
+    // 🔌 SUPABASE
+    // =========================
+    const sb = window.supabase.createClient(
+      "https://jtsivhltrbpishfyhfxl.supabase.co",
+      "sb_publishable_K6rHpM-Xy26NF3nlYf7Czg_2mgceKkP"
+    );
+
+    // =========================
+    // 📦 DOM
+    // =========================
+    const messagesDiv = document.getElementById("messages");
+    const input = document.getElementById("message");
+    const onlineDiv = document.getElementById("onlineUsers");
+    const typingDiv = document.getElementById("typing");
+
+    // =========================
+    // 👤 USER / SESSION
+    // =========================
+    const user = localStorage.getItem("user");
+    if (!user) {
+      window.location.href = "login.html";
+      return;
+    }
+    async function cleanupStaleUsers() {
+  const cutoff = new Date(Date.now() - 15000).toISOString();
+
+  await sb
+    .from("users")
+    .update({ session_id: null })
+    .lt("last_seen", cutoff);
+}
+    let sessionId = localStorage.getItem("sessionId");
+    if (!sessionId) {
+      sessionId = Math.random().toString(36);
+      localStorage.setItem("sessionId", sessionId);
+    }
+
+    // =========================
+    // 🧠 STATE
+    // =========================
+    const renderedIds = new Set(); // 🔥 FIXED
+    let oldestLoadedTime = null;
+    let loadingMore = false;
+
+    // =========================
+    // 👥 USERS CACHE
+    // =========================
+   async function loadUsers() {
   const { data } = await sb
     .from("users")
     .select("username, avatar_url, color");
@@ -51,74 +102,12 @@
   if (!data) return;
 
   userCache = {};
+
   data.forEach(u => {
-    userCache[u.username] = u;
+    const key = (u.username || "").trim().toLowerCase();
+    userCache[key] = u;
   });
 }
-  // =========================
-// 🌍 GLOBAL BUTTON FUNCTIONS (FIX)
-// =========================
-
-// 🚪 logout
-window.logout = function () {
-  localStorage.clear();
-  window.location.href = "login.html";
-};
-
-// 🛠 admin
-window.goAdmin = function () {
-  window.location.href = "admin.html";
-};
-
-// 👤 profile
-window.goProfile = function () {
-  window.location.href = "profile.html";
-};
-
-// 🌗 theme toggle
-window.toggleTheme = function () {
-  const current = document.body.getAttribute("data-theme");
-
-  if (current === "light") {
-    document.body.setAttribute("data-theme", "dark");
-    localStorage.setItem("theme", "dark");
-  } else {
-    document.body.setAttribute("data-theme", "light");
-    localStorage.setItem("theme", "light");
-  }
-};
-const savedTheme = localStorage.getItem("theme") || "dark";
-document.body.setAttribute("data-theme", savedTheme);
-  document.addEventListener("DOMContentLoaded", () => {
-
-    // =========================
-    // 🔌 SUPABASE
-    // =========================
-    window.sb = window.supabase.createClient(
-      "https://jtsivhltrbpishfyhfxl.supabase.co",
-      "sb_publishable_K6rHpM-Xy26NF3nlYf7Czg_2mgceKkP"
-    );
-
-    const messagesDiv = document.getElementById("messages");
-    const input = document.getElementById("message");
-    const onlineDiv = document.getElementById("onlineUsers");
-    const typingDiv = document.getElementById("typing");
-
-    const user = localStorage.getItem("user");
-    if (!user) {
-      window.location.href = "login.html";
-      return;
-    }
-
-    // =========================
-    // 🔒 SESSION
-    // =========================
-    let sessionId = localStorage.getItem("sessionId");
-    if (!sessionId) {
-      sessionId = Math.random().toString(36);
-      localStorage.setItem("sessionId", sessionId);
-    }
-
     // =========================
     // 🔒 USER CHECK
     // =========================
@@ -130,29 +119,36 @@ document.body.setAttribute("data-theme", savedTheme);
         .single();
 
       if (!data || data.banned) {
-        alert("Session ended");
         localStorage.clear();
         window.location.href = "login.html";
         return false;
       }
       return true;
     }
+function formatTime(ts) {
+  if (!ts) return "";
 
+  const date = new Date(ts);
+  return date.toLocaleTimeString([], {
+    hour: "2-digit",
+    minute: "2-digit"
+  });
+}
     // =========================
-    // 💬 RENDER MESSAGE ELEMENT
+    // 💬 RENDER MESSAGE
     // =========================
-    async function renderMessageElement(msg) {
+    function renderMessageElement(msg) {
+
+      if (renderedIds.has(msg.id)) return null;
+      renderedIds.add(msg.id);
+
       const div = document.createElement("div");
       div.className = "msg";
-
-      const { data } = await sb
-        .from("users")
-        .select("avatar_url, color")
-        .eq("username", msg.name)
-        .single();
-
-      const avatar = data?.avatar_url;
-      const color = data?.color || "#ffffff";
+      div.dataset.id = msg.id;
+const key = (msg.name || "").trim().toLowerCase();
+const userData = userCache[key] || {};
+      const avatar = userData.avatar_url;
+      const color = userData.color || "#fff";
       const fallback = msg.name.charAt(0).toUpperCase();
 
       const reactions = msg.reactions || {};
@@ -172,26 +168,24 @@ document.body.setAttribute("data-theme", savedTheme);
 
       div.innerHTML = `
         <div style="display:flex; gap:10px; margin-bottom:10px;">
-
           <div class="avatar">${avatarHTML}</div>
-
           <div class="msgContent">
             <b style="color:${color}">${msg.name}</b>
-            <div>${msg.message}</div>
+<div>${msg.message}</div>
 
+<div class="time">
+  ${formatTime(msg.created_at)}
+</div>
             <div class="reactions">${reactionHTML}</div>
-
             <div class="react-buttons">
               <button onclick="react('${msg.id}','👍')">👍</button>
               <button onclick="react('${msg.id}','😂')">😂</button>
               <button onclick="react('${msg.id}','🔥')">🔥</button>
             </div>
           </div>
-
         </div>
       `;
 
-      // 🔥 safe image fallback (NO SYNTAX BUGS)
       const img = div.querySelector("img");
       if (img) {
         img.onerror = () => {
@@ -204,31 +198,76 @@ document.body.setAttribute("data-theme", savedTheme);
     }
 
     // =========================
-    // 💬 LOAD MESSAGES (FAST)
+    // 📥 LOAD INITIAL
     // =========================
     async function loadMessages() {
+      renderedIds.clear();
+
       const { data } = await sb
         .from("oha_chat")
         .select("*")
-.order("created_at", { ascending: true })
-.limit(50)
-
+        .order("created_at", { ascending: false })
+        .limit(50);
 
       if (!data) return;
 
-      const elements = await Promise.all(
-        data.map(msg => renderMessageElement(msg))
-      );
+      const reversed = data.reverse();
+
+      const elements = reversed
+        .map(renderMessageElement)
+        .filter(Boolean);
 
       messagesDiv.replaceChildren(...elements);
-
       messagesDiv.scrollTop = messagesDiv.scrollHeight;
+
+      oldestLoadedTime = reversed[0]?.created_at || null;
     }
 
     // =========================
-    // 😊 REACTIONS (FIXED)
+    // ⬆️ LOAD OLDER
     // =========================
-    window.react = async function (id, emoji) {
+    async function loadOlderMessages() {
+      if (loadingMore || !oldestLoadedTime) return;
+      loadingMore = true;
+
+      const prevHeight = messagesDiv.scrollHeight;
+
+      const { data } = await sb
+        .from("oha_chat")
+        .select("*")
+        .lt("created_at", oldestLoadedTime)
+        .order("created_at", { ascending: false })
+        .limit(30);
+
+      if (!data || data.length === 0) {
+        loadingMore = false;
+        return;
+      }
+
+      const reversed = data.reverse();
+
+      reversed.forEach(msg => {
+        const el = renderMessageElement(msg);
+        if (el) messagesDiv.prepend(el);
+      });
+
+      messagesDiv.scrollTop =
+        messagesDiv.scrollHeight - prevHeight;
+
+      oldestLoadedTime = reversed[0].created_at;
+      loadingMore = false;
+    }
+
+    messagesDiv.addEventListener("scroll", () => {
+      if (messagesDiv.scrollTop < 100) {
+        loadOlderMessages();
+      }
+    });
+
+    // =========================
+    // 😊 REACTIONS
+    // =========================
+    window.react = async (id, emoji) => {
       const { data } = await sb
         .from("oha_chat")
         .select("reactions")
@@ -236,22 +275,17 @@ document.body.setAttribute("data-theme", savedTheme);
         .single();
 
       let reactions = data?.reactions || {};
+      reactions[emoji] = (reactions[emoji] || 0) + 1;
 
-      if (!reactions[emoji]) reactions[emoji] = 0;
-      reactions[emoji]++;
-
-      await sb
-        .from("oha_chat")
+      await sb.from("oha_chat")
         .update({ reactions })
         .eq("id", id);
-
-setTimeout(loadMessages, 200);
     };
 
     // =========================
-    // 📤 SEND MESSAGE
+    // 📤 SEND
     // =========================
-    async function sendMessage() {
+    window.sendMessage = async () => {
       const message = input.value.trim();
       if (!message) return;
 
@@ -267,9 +301,7 @@ setTimeout(loadMessages, 200);
       await sb.from("users")
         .update({ typing: false })
         .eq("username", user);
-    }
-
-    window.sendMessage = sendMessage;
+    };
 
     input.addEventListener("keydown", (e) => {
       if (e.key === "Enter") {
@@ -277,179 +309,141 @@ setTimeout(loadMessages, 200);
         sendMessage();
       }
     });
-
-    // =========================
-    // ✍️ TYPING
-    // =========================
     let typingTimeout;
+let isTyping = false;
 
-    input.addEventListener("input", async () => {
-      clearTimeout(typingTimeout);
+input.addEventListener("input", () => {
+  if (!isTyping) {
+    isTyping = true;
+    sb.from("users")
+      .update({ typing: true })
+      .eq("username", user);
+  }
 
-      await sb.from("users")
-        .update({ typing: true })
-        .eq("username", user);
+  clearTimeout(typingTimeout);
 
-      typingTimeout = setTimeout(async () => {
-        await sb.from("users")
-          .update({ typing: false })
-          .eq("username", user);
-      }, 1500);
-    });
+  typingTimeout = setTimeout(() => {
+    isTyping = false;
+    sb.from("users")
+      .update({ typing: false })
+      .eq("username", user);
+  }, 1500);
+});
 
-    async function loadTyping() {
-      const { data } = await sb
-        .from("users")
-        .select("username, typing");
+async function loadTyping() {
+  const { data } = await sb
+    .from("users")
+    .select("username, typing");
 
-      if (!data) return;
+  if (!data) return;
 
-      const typingUsers = data
-        .filter(u => u.typing && u.username !== user)
-        .map(u => u.username);
+  const typingUsers = data
+    .filter(u => u.typing && u.username !== user)
+    .map(u => u.username);
 
-      typingDiv.textContent =
-        typingUsers.length > 0
-          ? typingUsers.join(", ") + " is typing..."
-          : "";
-    }
+  typingDiv.textContent =
+    typingUsers.length > 0
+      ? typingUsers.join(", ") + " is typing..."
+      : "";
+}
+async function updatePresence() {
+  await sb
+    .from("users")
+    .update({
+      last_seen: new Date().toISOString(),
+      session_id: sessionId
+    })
+    .eq("username", user);
+}
 
-    // =========================
-    // 🟢 ONLINE SYSTEM
-    // =========================
-    async function updatePresence() {
-      await sb
-        .from("users")
-        .update({
-          last_seen: new Date().toISOString(),
-          session_id: sessionId
-        })
-        .eq("username", user);
-    }
+ async function loadOnlineUsers() {
+  const { data } = await sb
+    .from("users")
+    .select("username, last_seen, session_id");
 
-    async function loadOnlineUsers() {
-      const { data } = await sb
-        .from("users")
-        .select("username, last_seen, session_id");
+  if (!data) return;
 
-      if (!data) return;
+  const now = Date.now();
+  onlineDiv.innerHTML = "";
 
-      const now = Date.now();
-      onlineDiv.innerHTML = "";
+  data.forEach(u => {
+    const lastSeen = new Date(u.last_seen || 0).getTime();
 
-      data.forEach(u => {
-        if (!u.last_seen || !u.session_id) {
-          showUser(u.username, false);
-          return;
-        }
+    const isOnline =
+      u.session_id === sessionId &&
+      u.last_seen &&
+      (now - lastSeen) < 8000;
 
-        const diff = now - Date.parse(u.last_seen + "Z");
+    const div = document.createElement("div");
+    div.textContent = `${isOnline ? "🟢" : "⚫"} ${u.username}`;
+    onlineDiv.appendChild(div);
+  });
+}
+document.getElementById("logoutBtn").onclick = () => {
+  localStorage.clear();
+  window.location.href = "login.html";
+};
 
-        const isOnline =
-          diff < 2500 &&
-          typeof u.session_id === "string" &&
-          u.session_id.length > 5;
+document.getElementById("adminBtn").onclick = () => {
+  window.location.href = "admin.html";
+};
 
-        showUser(u.username, isOnline);
-      });
-    }
-
-    function showUser(name, isOnline) {
-      const div = document.createElement("div");
-      div.textContent = `${isOnline ? "🟢" : "⚫"} ${name}`;
-      onlineDiv.appendChild(div);
-    }
-
-    // =========================
-    // 🧹 FORCE OFFLINE
-    // =========================
-    window.addEventListener("pagehide", () => {
-      navigator.sendBeacon(
-        `https://jtsivhltrbpishfyhfxl.supabase.co/rest/v1/users?username=eq.${user}`,
-        new Blob([JSON.stringify({
-          session_id: null,
-          last_seen: null
-        })], { type: "application/json" })
-      );
-    });
-
+document.getElementById("profileBtn").onclick = () => {
+  window.location.href = "profile.html";
+};
+function showUser(name, isOnline) {
+  const div = document.createElement("div");
+  div.textContent = `${isOnline ? "🟢" : "⚫"} ${name}`;
+  onlineDiv.appendChild(div);
+}
     // =========================
     // 🔄 REALTIME
     // =========================
-<!--    sb.channel("chat")-->
-<!--      .on("postgres_changes", {-->
-<!--        event: "*",-->
-<!--        schema: "public",-->
-<!--        table: "oha_chat"-->
-<!--      }, loadMessages)-->
-<!--      .subscribe();-->
+    sb.channel("chat")
+      .on("postgres_changes", {
+        event: "INSERT",
+        schema: "public",
+        table: "oha_chat"
+      }, (payload) => {
+        const el = renderMessageElement(payload.new);
+        if (!el) return;
 
-   sb.channel("chat")
-  .on("postgres_changes", {
-    event: "INSERT",
-    schema: "public",
-    table: "oha_chat"
-  }, async (payload) => {
-    const el = await renderMessageElement(payload.new);
-    messagesDiv.appendChild(el);
-    messagesDiv.scrollTop = messagesDiv.scrollHeight;
-  })
-  .subscribe();
-
-
+        messagesDiv.appendChild(el);
+        messagesDiv.scrollTop = messagesDiv.scrollHeight;
+      })
+      .subscribe();
+if (localStorage.getItem("profileUpdated")) {
+  localStorage.removeItem("profileUpdated");
+  loadUsers(); // refresh avatar cache
+}
     // =========================
     // 🚀 START
     // =========================
-    setInterval(updatePresence, 1000);
-    setInterval(loadOnlineUsers, 1200);
-    setInterval(loadTyping, 1000);
+    await loadUsers();
 
-    updatePresence();
-    loadOnlineUsers();
-    loadTyping();
-    loadMessages();
-    input.focus();
+await loadMessages(); // ONLY ONCE
 
+updatePresence();
+loadOnlineUsers();
+loadTyping();
+
+setInterval(updatePresence, 3000);
+setInterval(loadOnlineUsers, 2000);
+setInterval(loadTyping, 1000);
+
+cleanupStaleUsers();
+input.focus();
+ window.addEventListener("pagehide", () => {
+  navigator.sendBeacon(
+    `https://jtsivhltrbpishfyhfxl.supabase.co/rest/v1/users?username=eq.${user}`,
+    new Blob([JSON.stringify({
+      session_id: null,
+      last_seen: null
+    })], { type: "application/json" })
+  );
+});
   });
 
-  // =========================
-  // 📷 AVATAR UPLOAD
-  // =========================
-  window.uploadAvatar = async function () {
-    const user = localStorage.getItem("user");
-    const fileInput = document.getElementById("avatarUpload");
-    const file = fileInput.files[0];
-
-    if (!file) {
-      alert("Pick an image first");
-      return;
-    }
-
-    const filePath = `${user}-${Date.now()}.png`;
-
-    const { error } = await sb.storage
-      .from("avatars")
-      .upload(filePath, file);
-
-    if (error) {
-      console.error(error);
-      alert("Upload failed");
-      return;
-    }
-
-    const { data } = sb.storage
-      .from("avatars")
-      .getPublicUrl(filePath);
-
-    await sb
-      .from("users")
-      .update({ avatar_url: data.publicUrl })
-      .eq("username", user);
-
-    alert("Avatar updated!");
-    location.reload();
-  };
 </script>
-
 </body>
 </html>
