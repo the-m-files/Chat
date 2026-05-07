@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Polynomial Solver</title>
+<link rel="stylesheet" href="chat.css">
+</head>
+<body>
+
+<div class="solverPage">
+
+    <div class="solverTopbar">
+        Polynomial Solver
+    </div>
+
+    <div class="solverContent">
+
+        <div class="solverBox">
+
+            <p>
+                Enter coefficients separated by spaces.
+            </p>
+
+            <div class="solverExample">
+                Example: 2 -3 -8 12
+            </div>
+
+            <input
+                    id="coeffs"
+                    placeholder="Enter coefficients..."
+            >
+
+            <button onclick="solve()">
+                Solve
+            </button>
+
+            <div id="output"></div>
+
+        </div>
+
+    </div>
+
+</div>
+<script>
+    function factors(n) {
+
+        n = Math.abs(parseInt(n));
+
+        let result = [];
+
+        for (let i = 1; i <= Math.sqrt(n); i++) {
+
+            if (n % i === 0) {
+
+                result.push(i);
+
+                if (i !== n / i) {
+                    result.push(n / i);
+                }
+            }
+        }
+
+        return result;
+    }
+
+    function evaluate(coeffs, x) {
+
+        let result = 0;
+
+        for (let coeff of coeffs) {
+            result = result * x + coeff;
+        }
+
+        return result;
+    }
+
+    function rationalRoots(coeffs) {
+
+        let leading = coeffs[0];
+
+        let constant = coeffs[coeffs.length - 1];
+
+        let pFactors = factors(constant);
+
+        let qFactors = factors(leading);
+
+        let candidates = [];
+
+        for (let p of pFactors) {
+
+            for (let q of qFactors) {
+
+                let val = p / q;
+
+                candidates.push(val);
+                candidates.push(-val);
+            }
+        }
+
+        candidates = [...new Set(candidates)];
+
+        let roots = [];
+
+        for (let root of candidates) {
+
+            let value = evaluate(coeffs, root);
+
+            // more forgiving precision check
+            if (Math.abs(value) < 0.0000001) {
+
+                roots.push(root);
+            }
+        }
+
+        return roots;
+    }
+
+    function solve() {
+
+        let input =
+            document.getElementById("coeffs").value.trim();
+
+        let coeffs =
+            input.split(/\s+/).map(Number);
+
+        let output =
+            document.getElementById("output");
+
+        if (coeffs.some(isNaN) || coeffs.length < 2) {
+
+            output.innerHTML = "Invalid input.";
+
+            return;
+        }
+
+        let roots = rationalRoots(coeffs);
+
+        if (roots.length === 0) {
+
+            output.innerHTML =
+                "No rational roots found.";
+
+            return;
+        }
+
+        output.innerHTML =
+            "<b>Roots:</b><br>" +
+            roots.map(r => "x = " + r).join("<br>");
+    }
+</script>
+
+</body>
+</html>

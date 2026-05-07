@@ -27,63 +27,133 @@
 </div>
 
 <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+
 <script>
+    // =========================
+    // 🔌 SUPABASE
+    // =========================
     const sb = window.supabase.createClient(
       "https://jtsivhltrbpishfyhfxl.supabase.co",
       "sb_publishable_K6rHpM-Xy26NF3nlYf7Czg_2mgceKkP"
     );
 
+    // =========================
+    // 👤 USER
+    // =========================
     const user = localStorage.getItem("user");
-    if (!user) location.href = "login.html";
+
+    if (!user) {
+      window.location.href = "login.html";
+    }
 
     // =========================
-    // LOAD PROFILE
+    // 📥 LOAD PROFILE
     // =========================
     async function loadProfile() {
-      const { data } = await sb
+
+      const { data, error } = await sb
         .from("users")
         .select("avatar_url, color")
         .eq("username", user)
         .single();
 
-      document.getElementById("profileName").textContent = user;
-
-      const avatarDiv = document.getElementById("profileAvatar");
-
-      if (data?.avatar_url) {
-        avatarDiv.innerHTML = `<img src="${data.avatar_url}">`;
-      } else {
-        avatarDiv.textContent = user[0].toUpperCase();
+      if (error) {
+        console.error(error);
+        return;
       }
 
+      // 👤 username
+      const profileName =
+        document.getElementById("profileName");
+
+      profileName.textContent = user;
+
+      // 🎨 color
       if (data?.color) {
-        document.getElementById("colorPicker").value = data.color;
-        document.getElementById("profileName").style.color = data.color;
+        profileName.style.color = data.color;
+        document.getElementById("colorPicker").value =
+          data.color;
+      }
+
+      // 🖼 avatar
+      const avatarDiv =
+        document.getElementById("profileAvatar");
+
+      avatarDiv.innerHTML = "";
+
+      if (data?.avatar_url) {
+
+        const img = document.createElement("img");
+        img.src = data.avatar_url;
+
+        // 🔥 fallback if image breaks
+        img.onerror = () => {
+          avatarDiv.textContent =
+            user.charAt(0).toUpperCase();
+        };
+
+        avatarDiv.appendChild(img);
+
+      } else {
+
+        avatarDiv.textContent =
+          user.charAt(0).toUpperCase();
       }
     }
 
     // =========================
-    // SAVE PROFILE
+    // 💾 SAVE PROFILE
     // =========================
     async function saveProfile() {
-      const color = document.getElementById("colorPicker").value;
-      const file = document.getElementById("avatarUpload").files[0];
+
+      const color =
+        document.getElementById("colorPicker").value;
+
+      const file =
+        document.getElementById("avatarUpload").files[0];
 
       let avatarUrl = null;
 
+      // =========================
+      // 📷 HANDLE IMAGE
+      // =========================
       if (file) {
-        const filePath = `${user}-${Date.now()}.png`;
 
+        // 🔥 size limit
+        if (file.size > 5 * 1024 * 1024) {
+          alert("Image too large (max 5MB)");
+          return;
+        }
+
+        // 🔥 safe extension
+        const ext =
+          file.name.split(".").pop();
+
+        // 🔥 safe username
+        const safeUser = user
+          .replace(/[^a-z0-9]/gi, "_")
+          .toLowerCase();
+
+        const filePath =
+          `${safeUser}-${Date.now()}.${ext}`;
+
+        // =========================
+        // ⬆️ UPLOAD
+        // =========================
         const { error } = await sb.storage
           .from("avatars")
           .upload(filePath, file);
 
+        // 🔴 show real error
         if (error) {
-          alert("Upload failed");
           console.error(error);
+          alert(error.message);
           return;
         }
 
+        // =========================
+        // 🌍 GET PUBLIC URL
+        // =========================
         const { data } = sb.storage
           .from("avatars")
           .getPublicUrl(filePath);
@@ -91,30 +161,47 @@
         avatarUrl = data.publicUrl;
       }
 
-      const updateData = { color };
-      if (avatarUrl) updateData.avatar_url = avatarUrl;
+      // =========================
+      // 💾 UPDATE USER
+      // =========================
+      const updateData = {
+        color
+      };
 
-      await sb
+      if (avatarUrl) {
+        updateData.avatar_url = avatarUrl;
+      }
+
+      const { error: updateError } = await sb
         .from("users")
         .update(updateData)
         .eq("username", user);
 
-      alert("Profile updated!");
-      loadProfile();
+      if (updateError) {
+        console.error(updateError);
+        alert(updateError.message);
+        return;
+      }
 
-// notify chat to refresh on next open
-localStorage.setItem("profileUpdated", "1");
+      // =========================
+      // 🔄 REFRESH UI
+      // =========================
+      alert("Profile updated!");
+
+      loadProfile();
     }
 
     // =========================
-    // NAV
+    // 🔙 NAV
     // =========================
     function goBack() {
       window.location.href = "index.html";
     }
 
+    // =========================
+    // 🚀 START
+    // =========================
     loadProfile();
 </script>
-
 </body>
 </html>
