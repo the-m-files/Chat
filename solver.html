@@ -41,9 +41,28 @@
 
 </div>
 <script>
+    function gcd(a, b) {
+        while (b !== 0) {
+            let t = b;
+            b = a % b;
+            a = t;
+        }
+        return Math.abs(a);
+    }
+
+    function simplifyFraction(n, d) {
+
+        let g = gcd(n, d);
+
+        return {
+            n: n / g,
+            d: d / g
+        };
+    }
+
     function factors(n) {
 
-        n = Math.abs(parseInt(n));
+        n = Math.abs(n);
 
         let result = [];
 
@@ -64,75 +83,116 @@
 
     function evaluate(coeffs, x) {
 
-        let result = 0;
+        // Horner's Method
+        let result = coeffs[0];
 
-        for (let coeff of coeffs) {
-            result = result * x + coeff;
+        for (let i = 1; i < coeffs.length; i++) {
+            result = result * x + coeffs[i];
         }
 
         return result;
     }
 
-    function rationalRoots(coeffs) {
+
+function syntheticDivide(coeffs, root) {
+
+    let result = [coeffs[0]];
+
+    for (let i = 1; i < coeffs.length; i++) {
+
+        result[i] =
+            coeffs[i] +
+            result[i - 1] * root;
+    }
+
+    result.pop(); // remove remainder
+
+    return result;
+}
+
+function rationalRoots(coeffs) {
+
+    let roots = [];
+
+    while (coeffs.length > 1) {
 
         let leading = coeffs[0];
-
         let constant = coeffs[coeffs.length - 1];
 
         let pFactors = factors(constant);
-
         let qFactors = factors(leading);
 
-        let candidates = [];
+        let found = false;
 
         for (let p of pFactors) {
 
             for (let q of qFactors) {
 
-                let val = p / q;
+                for (let sign of [1, -1]) {
 
-                candidates.push(val);
-                candidates.push(-val);
+                    let root =
+                        (sign * p) / q;
+
+                    let val =
+                        evaluate(coeffs, root);
+
+                    if (Math.abs(val) < 0.0000001) {
+
+                        roots.push(root);
+
+                        // divide polynomial
+                        coeffs =
+                            syntheticDivide(
+                                coeffs,
+                                root
+                            );
+
+                        found = true;
+
+                        break;
+                    }
+                }
+
+                if (found) break;
             }
+
+            if (found) break;
         }
 
-        candidates = [...new Set(candidates)];
-
-        let roots = [];
-
-        for (let root of candidates) {
-
-            let value = evaluate(coeffs, root);
-
-            // more forgiving precision check
-            if (Math.abs(value) < 0.0000001) {
-
-                roots.push(root);
-            }
-        }
-
-        return roots;
+        if (!found) break;
     }
+
+    return roots;
+}
 
     function solve() {
 
         let input =
-            document.getElementById("coeffs").value.trim();
+            document
+            .getElementById("coeffs")
+            .value
+            .trim();
 
         let coeffs =
-            input.split(/\s+/).map(Number);
+            input
+            .split(/\s+/)
+            .map(Number);
 
         let output =
-            document.getElementById("output");
+            document
+            .getElementById("output");
 
-        if (coeffs.some(isNaN) || coeffs.length < 2) {
-
-            output.innerHTML = "Invalid input.";
-
+        if (
+            coeffs.length < 2 ||
+            coeffs.some(isNaN)
+        ) {
+            output.innerHTML =
+                "Invalid coefficients.";
             return;
         }
 
-        let roots = rationalRoots(coeffs);
+        let roots =
+            rationalRoots(coeffs);
 
         if (roots.length === 0) {
 
@@ -144,7 +204,8 @@
 
         output.innerHTML =
             "<b>Roots:</b><br>" +
-            roots.map(r => "x = " + r).join("<br>");
+            roots.map(r => "x = " + r)
+                 .join("<br>");
     }
 </script>
 
