@@ -9,13 +9,13 @@
 
 <div class="container">
 
-  <!-- 🟢 SIDEBAR -->
+  <!-- SIDEBAR -->
   <div class="sidebar">
     <h3>Online</h3>
     <div id="onlineUsers"></div>
   </div>
 
-  <!-- 💬 MAIN CHAT -->
+  <!-- MAIN CHAT -->
   <div class="chat">
 
     <div class="topbar">
@@ -50,7 +50,7 @@
   document.addEventListener("DOMContentLoaded", async () => {
       let userCache = {};
     // =========================
-    // 🔌 SUPABASE
+    //  SUPABASE
     // =========================
     const sb = window.supabase.createClient(
       "https://jtsivhltrbpishfyhfxl.supabase.co",
@@ -58,7 +58,7 @@
     );
 
     // =========================
-    // 📦 DOM
+    //  DOM
     // =========================
     const messagesDiv = document.getElementById("messages");
     const input = document.getElementById("message");
@@ -66,7 +66,7 @@
     const typingDiv = document.getElementById("typing");
 
     // =========================
-    // 👤 USER / SESSION
+    // USER / SESSION
     // =========================
     const user = localStorage.getItem("user");
     if (!user) {
@@ -88,14 +88,14 @@
     }
 
     // =========================
-    // 🧠 STATE
+    //  STATE
     // =========================
-    const renderedIds = new Set(); // 🔥 FIXED
+    const renderedIds = new Set(); 
     let oldestLoadedTime = null;
     let loadingMore = false;
 
     // =========================
-    // 👥 USERS CACHE
+    //  USERS CACHE
     // =========================
    async function loadUsers() {
   const { data } = await sb
@@ -112,7 +112,7 @@
   });
 }
     // =========================
-    // 🔒 USER CHECK
+    //  USER CHECK
     // =========================
     async function checkUserStatus() {
       const { data } = await sb
@@ -138,7 +138,7 @@ function formatTime(ts) {
   });
 }
     // =========================
-    // 💬 RENDER MESSAGE
+    //  RENDER MESSAGE
     // =========================
     function renderMessageElement(msg) {
 
@@ -201,7 +201,7 @@ const userData = userCache[key] || {};
     }
 
     // =========================
-    // 📥 LOAD INITIAL
+    //  LOAD INITIAL
     // =========================
     async function loadMessages() {
       renderedIds.clear();
@@ -227,7 +227,7 @@ const userData = userCache[key] || {};
     }
 
     // =========================
-    // ⬆️ LOAD OLDER
+    //  LOAD OLDER
     // =========================
     async function loadOlderMessages() {
       if (loadingMore || !oldestLoadedTime) return;
@@ -268,7 +268,7 @@ const userData = userCache[key] || {};
     });
 
     // =========================
-    // 😊 REACTIONS
+    //  REACTIONS
     // =========================
     window.react = async (id, emoji) => {
       const { data } = await sb
@@ -286,7 +286,7 @@ const userData = userCache[key] || {};
     };
 
     // =========================
-    // 📤 SEND
+    //  SEND
     // =========================
     window.sendMessage = async () => {
       const message = input.value.trim();
@@ -400,7 +400,7 @@ function showUser(name, isOnline) {
   onlineDiv.appendChild(div);
 }
     // =========================
-    // 🔄 REALTIME
+    //  REALTIME
     // =========================
     sb.channel("chat")
       .on("postgres_changes", {
@@ -420,7 +420,7 @@ if (localStorage.getItem("profileUpdated")) {
   loadUsers(); // refresh avatar cache
 }
     // =========================
-    // 🚀 START
+    //  START
     // =========================
     await loadUsers();
 
