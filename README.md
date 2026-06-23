@@ -1,5 +1,1 @@
-<div align="center">
-  <img src="https://media2.giphy.com/media/v1.Y2lkPTc5MGI3NjExYmk1dXg0dDRkbjNrYXYzMHJqZXZ4cTN4YXdsYTZsczMwYXo2Z3ozdSZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/H4J8EHStbORjh154Fu/giphy.gif" width="300" alt="My Profile GIF" />
-</div>
-
-
+this stopped working 6/23/26, my supabase account was terminated so it wont work anymore unless i activate it again.
